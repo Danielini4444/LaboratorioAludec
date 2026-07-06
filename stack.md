@@ -159,7 +159,7 @@ Reglas:
   por componente ni estilos inline.
 - **Sin otro framework** (Bootstrap) ni preprocesador (SCSS/Less): Tailwind cubre todo.
 
-> ✅ **lab ya está en Tailwind.** `client/src/styles.css` es el ejemplo de
+> **lab ya está en Tailwind.** `client/src/styles.css` es el ejemplo de
 > referencia: `@import "tailwindcss"` + `@theme` (el tema compartido) + las clases
 > de componentes en `@layer components`. Tómalo como plantilla del tema para los
 > demás sistemas.
