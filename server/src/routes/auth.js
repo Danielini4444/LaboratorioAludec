@@ -15,7 +15,8 @@ router.post('/login', async (req, res, next) => {
        WHERE u.usuario = $1 AND u.activo`, [usuario]
     );
     const u = rows[0];
-    if (!u || !(await bcrypt.compare(password, u.password_hash))) {
+    // Los usuarios del SSO (sin password_hash) no pueden entrar por el login local.
+    if (!u || !u.password_hash || !(await bcrypt.compare(password, u.password_hash))) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
     req.session.user = { id: u.id, usuario: u.usuario, nombre: u.nombre, rol: u.rol, area_id: u.area_id,
