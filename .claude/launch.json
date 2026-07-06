@@ -18,6 +18,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "client", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "qms-portal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\training\\Downloads\\qms-login\\portal", "run", "dev"],
+      "port": 5190
     }
   ]
 }
