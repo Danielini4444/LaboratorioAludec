@@ -8,16 +8,39 @@ const QRCode = require('qrcode');
 
 const SECRETO = process.env.FIRMA_SECRET || process.env.SESSION_SECRET || 'cambia-este-secreto';
 
-// IP del equipo en la red local (la que usan los demás equipos de la
-// intranet para entrar al sistema): primera IPv4 no interna.
-function ipLocal() {
+// Interfaces que NUNCA son la red por la que entra un teléfono: switches
+// virtuales (Hyper-V/Docker/WSL), VPN y loopback. Se descartan siempre.
+const INTERFAZ_NO_USABLE = /vEthernet|virtual|docker|wsl|vpn|tap|tun|loopback|zerotier|tailscale/i;
+
+// IP(s) del equipo por las que un teléfono en la misma red podría llegar.
+// No hay forma de adivinar CUÁL red usa el teléfono cuando el equipo tiene
+// varias activas a la vez (Wi-Fi normal + un hotspot que el propio equipo
+// comparte, por ejemplo) — por eso esto es solo un respaldo de desarrollo;
+// para un despliegue real, fija APP_URL en el .env y esto no se usa.
+function candidatosIp() {
   const redes = os.networkInterfaces();
+  const candidatos = [];
   for (const nombre of Object.keys(redes)) {
+    if (INTERFAZ_NO_USABLE.test(nombre)) continue;
     for (const red of redes[nombre] || []) {
-      if (red.family === 'IPv4' && !red.internal) return red.address;
+      if (red.family === 'IPv4' && !red.internal) candidatos.push(red.address);
     }
   }
-  return 'localhost';
+  return candidatos;
+}
+
+let avisada = false;
+function ipLocal() {
+  const candidatos = candidatosIp();
+  if (candidatos.length > 1 && !avisada) {
+    avisada = true;
+    console.warn(
+      `[firma] Este equipo tiene ${candidatos.length} redes activas (${candidatos.join(', ')}); ` +
+      'no se puede saber cuál usa el teléfono que escanea el QR. ' +
+      'Fija APP_URL en server/.env con la dirección correcta para no depender de esta detección automática.'
+    );
+  }
+  return candidatos[0] || 'localhost';
 }
 
 function generarToken(tipo, docId, usuarioId, fechaIso) {
