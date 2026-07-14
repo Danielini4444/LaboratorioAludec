@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { ensayosDe } from '../ensayosCatalogo.js';
+import { val } from '../validaciones.js';
 
 const LINEA_VACIA = { ensayo: '', num_muestras: '', observaciones: '' };
 
@@ -117,13 +118,13 @@ export default function NuevaSolicitud() {
             </select>
           </label>
           <label>Referencia
-            <input value={form.referencia} onChange={setConAutocompletado('referencia')} required list="sol-referencias" />
+            <input value={form.referencia} onChange={setConAutocompletado('referencia')} required {...val('referencia')} list="sol-referencias" />
             <datalist id="sol-referencias">
               {piezasFiltradas.map(p => <option key={p.id} value={p.referencia}>{p.denominacion}</option>)}
             </datalist>
           </label>
           <label>Denominación
-            <input value={form.denominacion} onChange={setConAutocompletado('denominacion')} list="sol-denominaciones" />
+            <input value={form.denominacion} onChange={setConAutocompletado('denominacion')} {...val('denominacion')} list="sol-denominaciones" />
             <datalist id="sol-denominaciones">
               {piezasFiltradas.map(p => <option key={p.id} value={p.denominacion} />)}
             </datalist>
@@ -132,17 +133,17 @@ export default function NuevaSolicitud() {
 
         {esMP ? (
           <div className="fila">
-            <label>Proveedor<input value={form.proveedor} onChange={set('proveedor')} /></label>
-            <label>N° de etiqueta<input value={form.numero_etiqueta} onChange={set('numero_etiqueta')} /></label>
-            <label>Color del material<input value={form.color_material} onChange={set('color_material')} /></label>
+            <label>Proveedor<input value={form.proveedor} onChange={set('proveedor')} {...val('proveedor')} /></label>
+            <label>N° de etiqueta<input value={form.numero_etiqueta} onChange={set('numero_etiqueta')} {...val('numeroEtiqueta')} /></label>
+            <label>Color del material<input value={form.color_material} onChange={set('color_material')} {...val('colorMaterial')} /></label>
             <label>Fecha de caducidad<input type="date" value={form.fecha_caducidad} onChange={set('fecha_caducidad')} /></label>
           </div>
         ) : (
           <div className="fila">
-            <label>OF Cromado<input value={form.of_cromado} onChange={set('of_cromado')} /></label>
-            <label>OF Inyección<input value={form.of_inyeccion} onChange={set('of_inyeccion')} /></label>
-            <label>OF Ensamble<input value={form.of_ensamble} onChange={set('of_ensamble')} /></label>
-            <label>OF Pintura<input value={form.of_pintura} onChange={set('of_pintura')} /></label>
+            <label>OF Cromado<input value={form.of_cromado} onChange={set('of_cromado')} {...val('of')} inputMode="numeric" /></label>
+            <label>OF Inyección<input value={form.of_inyeccion} onChange={set('of_inyeccion')} {...val('of')} inputMode="numeric" /></label>
+            <label>OF Ensamble<input value={form.of_ensamble} onChange={set('of_ensamble')} {...val('of')} inputMode="numeric" /></label>
+            <label>OF Pintura<input value={form.of_pintura} onChange={set('of_pintura')} {...val('of')} inputMode="numeric" /></label>
           </div>
         )}
       </div>
@@ -166,7 +167,7 @@ export default function NuevaSolicitud() {
                     <input list={`cat-ensayos-${form.tipo}`} value={l.ensayo} onChange={setLinea(i, 'ensayo')}
                       placeholder="elige o escribe…" style={{ width: '100%', textAlign: 'left' }} />
                   </td>
-                  <td><input type="number" min="1" value={l.num_muestras} onChange={setLinea(i, 'num_muestras')} /></td>
+                  <td><input type="number" min="1" step="1" value={l.num_muestras} onChange={setLinea(i, 'num_muestras')} /></td>
                   <td><input value={l.observaciones} onChange={setLinea(i, 'observaciones')} style={{ width: '100%', textAlign: 'left' }} /></td>
                   <td><button type="button" className="btn-quitar-fila" onClick={() => quitarLinea(i)} title="Quitar">×</button></td>
                 </tr>

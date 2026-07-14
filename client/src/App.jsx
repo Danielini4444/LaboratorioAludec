@@ -93,7 +93,7 @@ function Layout({ children }) {
     <div className="app">
       <aside className="sidebar">
         <div className="marca">
-          <h1>ALUDEC</h1>
+          <img className="logo" src="/logo.png" alt="ALUDEC" />
           <div className="sub">Laboratorio</div>
         </div>
         <nav>

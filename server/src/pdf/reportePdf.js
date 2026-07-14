@@ -8,10 +8,12 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 
 const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
-const AZUL = '#5b9bd5';
-const FONDO = '#dde9f5';
-const BORDE = '#9dc3e6';
-const GRIS = '#5b6b84';
+// Paleta styles.md §7: gris oscuro de marca (naranja se reserva para acentos).
+const PRIMARIO = '#1d252d';
+const PRIMARIO_HOVER = '#333f48';
+const FONDO = '#eceded';
+const BORDE = '#d0d3d4';
+const GRIS = '#5b6770';
 const MARGEN = 50;
 const ANCHO_UTIL = 612 - 2 * MARGEN;
 const LIMITE_Y = 700;
@@ -89,7 +91,7 @@ module.exports = function generarReportePdf(stream, reporte) {
   };
 
   // ===== Encabezado =====
-  doc.rect(MARGEN, MARGEN, ANCHO_UTIL - 150, 38).fillAndStroke(AZUL, AZUL);
+  doc.rect(MARGEN, MARGEN, ANCHO_UTIL - 150, 38).fillAndStroke(PRIMARIO, PRIMARIO);
   doc.fillColor('white').font('Helvetica-Bold').fontSize(13)
     .text('ALUDEC', MARGEN + 8, MARGEN + 12);
   doc.fontSize(12).text('INFORME DE ENSAYOS / TEST REPORT', MARGEN + 90, MARGEN + 13, { width: ANCHO_UTIL - 260, align: 'center' });
@@ -136,7 +138,7 @@ module.exports = function generarReportePdf(stream, reporte) {
     salto(110);
     // banner: Norma - Apartado Ensayo (como "TL 528 D-21 - 3.5.1 Grind Saw Test")
     const titulo = [p.norma, [p.apartado, p.ensayo].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
-    doc.rect(MARGEN, doc.y, ANCHO_UTIL, 16).fillAndStroke('#3a4456', '#3a4456');
+    doc.rect(MARGEN, doc.y, ANCHO_UTIL, 16).fillAndStroke(PRIMARIO_HOVER, PRIMARIO_HOVER);
     doc.fillColor('white').font('Helvetica-Bold').fontSize(8.5)
       .text(`Ensayo / Test ${p.numero}:  ${titulo}`, MARGEN + 6, doc.y + 4, { width: ANCHO_UTIL - 70 });
     if (p.valoracion) {
@@ -205,7 +207,7 @@ module.exports = function generarReportePdf(stream, reporte) {
     .text('CONCLUSIÓN / CONCLUSION', MARGEN + 6, doc.y + 4);
   doc.y += 8;
   if (reporte.conclusion) {
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(cumple ? '#1a7a2e' : '#b00020')
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(cumple ? '#15803d' : '#b91c1c')
       .text(cumple ? 'CUMPLE / PASS' : 'NO CUMPLE / FAIL', MARGEN, doc.y);
     doc.fillColor('black');
     doc.y += 4;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
+import { val } from '../validaciones.js';
 
 const AREAS_SOLICITANTES = ['Control Proceso', 'Calidad', 'Producción', 'Ingeniería'];
 
@@ -81,13 +82,13 @@ export default function NuevoReporte() {
             </select>
           </label>
           <label>Referencia
-            <input value={form.referencia} onChange={setConAutocompletado('referencia')} required list="rep-referencias" />
+            <input value={form.referencia} onChange={setConAutocompletado('referencia')} required {...val('referencia')} list="rep-referencias" />
             <datalist id="rep-referencias">
               {piezasFiltradas.map(p => <option key={p.id} value={p.referencia}>{p.denominacion}</option>)}
             </datalist>
           </label>
           <label>Denominación
-            <input value={form.denominacion} onChange={setConAutocompletado('denominacion')} required list="rep-denominaciones" />
+            <input value={form.denominacion} onChange={setConAutocompletado('denominacion')} required {...val('denominacion')} list="rep-denominaciones" />
             <datalist id="rep-denominaciones">
               {piezasFiltradas.map(p => <option key={p.id} value={p.denominacion} />)}
             </datalist>
@@ -98,7 +99,7 @@ export default function NuevoReporte() {
             <input value={form.descripcion_material} onChange={set('descripcion_material')}
               placeholder="ej. pieza completa cromada, componente soldado…" />
           </label>
-          <label>OF<input value={form.of} onChange={set('of')} placeholder="la asigna producción" /></label>
+          <label>OF<input value={form.of} onChange={set('of')} {...val('of')} inputMode="numeric" placeholder="la asigna producción" /></label>
         </div>
       </div>
 
@@ -111,12 +112,12 @@ export default function NuevoReporte() {
               {AREAS_SOLICITANTES.map(a => <option key={a} value={a} />)}
             </datalist>
           </label>
-          <label>Proyecto<input value={form.proyecto} onChange={set('proyecto')} /></label>
+          <label>Proyecto<input value={form.proyecto} onChange={set('proyecto')} {...val('proyecto')} /></label>
           <label>Fecha de recepción
             <input type="date" value={form.fecha_recepcion} onChange={set('fecha_recepcion')} />
           </label>
           <label>Cantidad de piezas recibidas
-            <input type="number" min="1" value={form.cantidad_piezas} onChange={set('cantidad_piezas')} />
+            <input type="number" min="1" step="1" value={form.cantidad_piezas} onChange={set('cantidad_piezas')} />
           </label>
         </div>
         <div className="fila">

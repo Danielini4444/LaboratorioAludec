@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAuth, ROLES_NOMBRE } from '../App.jsx';
 import { CAMPOS_NORMA, textoLimite } from '../especs.js';
+import { val, cumple } from '../validaciones.js';
 
 const ROLES_DE_AREA = ['admin_area', 'usuario_area'];
 
@@ -43,6 +44,7 @@ function Usuarios({ soloLectura }) {
   const resetPassword = async (u) => {
     const nueva = prompt(`Nueva contraseña para ${u.usuario} (mínimo 6 caracteres):`);
     if (!nueva) return;
+    if (!cumple('password', nueva)) return alert('La contraseña debe tener al menos 6 caracteres y no llevar espacios');
     try {
       await api(`/usuarios/${u.id}`, { method: 'PUT', body: { password: nueva } });
       alert('Contraseña actualizada');
@@ -55,9 +57,9 @@ function Usuarios({ soloLectura }) {
         <form className="tarjeta formulario" onSubmit={crear}>
           <h3>Nuevo usuario</h3>
           <div className="fila">
-            <label>Usuario<input value={form.usuario} onChange={set('usuario')} required /></label>
-            <label>Nombre<input value={form.nombre} onChange={set('nombre')} required /></label>
-            <label>Contraseña<input type="password" value={form.password} onChange={set('password')} required minLength={6} /></label>
+            <label>Usuario<input value={form.usuario} onChange={set('usuario')} required {...val('usuario')} /></label>
+            <label>Nombre<input value={form.nombre} onChange={set('nombre')} required {...val('nombrePersona')} /></label>
+            <label>Contraseña<input type="password" value={form.password} onChange={set('password')} required {...val('password')} /></label>
             <label>Rol
               <select value={form.rol} onChange={set('rol')}>
                 {Object.entries(ROLES_NOMBRE).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
@@ -149,8 +151,8 @@ function Piezas({ soloLectura }) {
         <form className="tarjeta formulario" onSubmit={crear}>
           <h3>Nueva pieza</h3>
           <div className="fila">
-            <label>Referencia<input value={form.referencia} onChange={set('referencia')} required /></label>
-            <label>Denominación<input value={form.denominacion} onChange={set('denominacion')} required /></label>
+            <label>Referencia<input value={form.referencia} onChange={set('referencia')} required {...val('referencia')} /></label>
+            <label>Denominación<input value={form.denominacion} onChange={set('denominacion')} required {...val('denominacion')} /></label>
             <label>Cliente
               <select value={form.cliente_id} onChange={set('cliente_id')} required>
                 <option value="">— elegir —</option>
@@ -241,8 +243,8 @@ function Equipos({ soloLectura }) {
         <form className="tarjeta formulario" onSubmit={crear}>
           <h3>Nuevo equipo</h3>
           <div className="fila">
-            <label>Nombre<input value={form.nombre} onChange={set('nombre')} required /></label>
-            <label>ID interno<input value={form.referencia_interna} onChange={set('referencia_interna')} placeholder="LM-INS-001" /></label>
+            <label>Nombre<input value={form.nombre} onChange={set('nombre')} required {...val('nombreCatalogo')} /></label>
+            <label>ID interno<input value={form.referencia_interna} onChange={set('referencia_interna')} {...val('equipoId')} placeholder="LM-INS-001" /></label>
             <label>Última calibración<input type="date" value={form.fecha_calibracion} onChange={set('fecha_calibracion')} /></label>
           </div>
           {error && <div className="error">{error}</div>}
@@ -319,7 +321,7 @@ function FormNorma({ espec, clientes, onGuardada, onCancelar }) {
             {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
           </select>
         </label>
-        <label>Norma<input value={norma} onChange={e => setNorma(e.target.value)} required /></label>
+        <label>Norma<input value={norma} onChange={e => setNorma(e.target.value)} required {...val('norma')} /></label>
       </div>
       <table className="tabla mediciones">
         <thead>
@@ -434,7 +436,7 @@ function ListaSimple({ recurso, titulo, soloLectura }) {
         <form className="tarjeta formulario" onSubmit={crear}>
           <h3>{titulo}</h3>
           <div className="fila">
-            <label>Nombre<input value={nombre} onChange={e => setNombre(e.target.value)} required /></label>
+            <label>Nombre<input value={nombre} onChange={e => setNombre(e.target.value)} required {...val('nombreCatalogo')} /></label>
           </div>
           {error && <div className="error">{error}</div>}
           <button type="submit">Agregar</button>

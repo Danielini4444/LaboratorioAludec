@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { textoLimite, fueraDeLimite, niTotalBase } from '../especs.js';
+import { val } from '../validaciones.js';
 import CargaFotos from '../components/CargaFotos.jsx';
 import Cargando from '../components/Cargando.jsx';
 
@@ -42,7 +43,7 @@ function CeldaMedicion({ valor, onChange, limites, clave }) {
   return (
     <td>
       <input
-        type="number" step="any" value={valor}
+        type="number" step="any" min="0" value={valor}
         className={fueraDeLimite(limites, clave, valor) ? 'fuera' : ''}
         onChange={e => onChange(e.target.value)}
       />
@@ -284,21 +285,21 @@ export default function NuevoRegistro() {
             <label>Norma<input value={espec ? espec.norma : ''} readOnly placeholder="según cliente" /></label>
           )}
           <label>Referencia
-            <input value={cabecera.referencia} onChange={setConAutocompletado('referencia')} required list="cat-referencias" placeholder="escribe para autocompletar" />
+            <input value={cabecera.referencia} onChange={setConAutocompletado('referencia')} required {...val('referencia')} list="cat-referencias" placeholder="escribe para autocompletar" />
             <datalist id="cat-referencias">
               {piezasFiltradas.map(p => <option key={p.id} value={p.referencia}>{p.denominacion}</option>)}
             </datalist>
           </label>
           <label>Denominación
-            <input value={cabecera.denominacion} onChange={setConAutocompletado('denominacion')} required list="cat-denominaciones" placeholder="escribe para autocompletar" />
+            <input value={cabecera.denominacion} onChange={setConAutocompletado('denominacion')} required {...val('denominacion')} list="cat-denominaciones" placeholder="escribe para autocompletar" />
             <datalist id="cat-denominaciones">
               {piezasFiltradas.map(p => <option key={p.id} value={p.denominacion} />)}
             </datalist>
           </label>
         </div>
         <div className="fila">
-          <label>OF<input value={cabecera.of} onChange={set('of')} placeholder="la asigna producción" /></label>
-          <label>Barra<input value={cabecera.barra} onChange={set('barra')} /></label>
+          <label>OF<input value={cabecera.of} onChange={set('of')} {...val('of')} inputMode="numeric" placeholder="la asigna producción" /></label>
+          <label>Barra<input value={cabecera.barra} onChange={set('barra')} {...val('barra')} /></label>
           <label>Fecha de producción<input type="date" value={cabecera.fecha_produccion} onChange={set('fecha_produccion')} /></label>
           <label>Fecha de prueba<input type="date" value={cabecera.fecha_prueba} onChange={set('fecha_prueba')} required /></label>
         </div>
@@ -310,7 +311,7 @@ export default function NuevoRegistro() {
           <div className="pieza-cabecera">
             <strong>Pieza {p.numero}</strong>
             <label className="inline">Posición de rack
-              <input value={p.posicion_rack} onChange={e => setPieza(i, { posicion_rack: e.target.value })} placeholder="FA3" />
+              <input value={p.posicion_rack} onChange={e => setPieza(i, { posicion_rack: e.target.value })} {...val('posicionRack')} placeholder="FA3" />
             </label>
             <label className="inline">Densidad
               <select value={p.densidad} onChange={e => setPieza(i, { densidad: e.target.value })}>
@@ -357,12 +358,12 @@ export default function NuevoRegistro() {
           <h4 className="sub-seccion">STEP y poros</h4>
           <div className="fila">
             <label>Punto STEP
-              <input type="number" value={p.step_punto} onChange={e => setPieza(i, { step_punto: e.target.value })} />
+              <input type="number" min="1" step="1" value={p.step_punto} onChange={e => setPieza(i, { step_punto: e.target.value })} />
             </label>
             {CAMPOS_STEP.map(([campo, etiqueta, clave, unidad]) => (
               <label key={campo}>{etiqueta} ({unidad}) <span className="espec-hint">{textoLimite(limites, clave)}</span>
                 <input
-                  type="number" step="any" value={p[campo]}
+                  type="number" step="any" min={campo.startsWith('ni_') ? '0' : undefined} value={p[campo]}
                   className={fueraDeLimite(limites, clave, p[campo], niTotalBase(p)) ? 'fuera' : ''}
                   onChange={e => setPieza(i, { [campo]: e.target.value })}
                 />
@@ -370,7 +371,7 @@ export default function NuevoRegistro() {
             ))}
             <label>Poros (poros/cm²) <span className="espec-hint">{textoLimite(limites, 'microporos')}</span>
               <input
-                type="number" value={p.poros}
+                type="number" min="0" step="1" value={p.poros}
                 className={fueraDeLimite(limites, 'microporos', p.poros) ? 'fuera' : ''}
                 onChange={e => setPieza(i, { poros: e.target.value })}
               />

@@ -6,6 +6,7 @@ import { esMetrologia } from './ReportesEnsayo.jsx';
 import Cargando from '../components/Cargando.jsx';
 import { useConfirmar } from '../components/Confirmar.jsx';
 import { useAviso } from '../components/Aviso.jsx';
+import { val } from '../validaciones.js';
 
 const PRUEBA_VACIA = { norma: '', ensayo: '', caracteristica: '' };
 
@@ -103,7 +104,7 @@ export default function PlanesPrueba() {
             </label>
             <label>Norma del plan
               <input value={planNorma} onChange={e => setPlanNorma(e.target.value)}
-                required placeholder="ej. GMW 14668, PS.50014" />
+                required {...val('norma')} placeholder="ej. GMW 14668, PS.50014" />
             </label>
           </div>
 
@@ -125,11 +126,11 @@ export default function PlanesPrueba() {
                     <td>{i + 1}</td>
                     <td>
                       <input style={{ width: '100%' }} value={p.ensayo} onChange={e => setPrueba(i, 'ensayo', e.target.value)}
-                        placeholder="ej. Stone Chip, Corrosión CASS" />
+                        {...val('nombreCatalogo')} placeholder="ej. Stone Chip, Corrosión CASS" />
                     </td>
                     <td>
                       <input style={{ width: '100%' }} value={p.norma} onChange={e => setPrueba(i, 'norma', e.target.value)}
-                        placeholder="(igual a la del plan)" />
+                        {...val('norma')} placeholder="(igual a la del plan)" />
                     </td>
                     <td>
                       <input style={{ width: '100%' }} value={p.caracteristica} onChange={e => setPrueba(i, 'caracteristica', e.target.value)}
