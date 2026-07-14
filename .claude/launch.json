@@ -18,6 +18,30 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "client", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "client (preview verify)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "client", "run", "dev", "--", "--port", "5200"],
+      "port": 5200
+    },
+    {
+      "name": "qms-portal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\training\\Downloads\\qms-login\\portal", "run", "dev"],
+      "port": 5190
+    },
+    {
+      "name": "cromado (UI)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\training\\Downloads\\cromado\\test\\frontend", "run", "dev"],
+      "port": 5178
+    },
+    {
+      "name": "compras (UI)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\training\\Downloads\\compras\\compras", "run", "dev:client"],
+      "port": 5188
     }
   ]
 }

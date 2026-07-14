@@ -8,6 +8,7 @@ import { useAviso } from '../components/Aviso.jsx';
 import CargaFotos from '../components/CargaFotos.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import Cargando from '../components/Cargando.jsx';
+import { val } from '../validaciones.js';
 
 const PRUEBA_VACIA = {
   ensayo: '', norma: '', apartado: '', criterios: '', equipo_id: '',
@@ -68,13 +69,13 @@ function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
       <h4 className="sub-seccion primera">Identificación de la prueba</h4>
       <div className="fila">
         <label>Ensayo
-          <input value={form.ensayo} onChange={set('ensayo')} required placeholder="ej. Grind Saw Test, Stone Chip" />
+          <input value={form.ensayo} onChange={set('ensayo')} required {...val('nombreCatalogo')} placeholder="ej. Grind Saw Test, Stone Chip" />
         </label>
         <label>Norma
-          <input value={form.norma} onChange={set('norma')} placeholder="ej. TL 528 D-21, WSS-M1P83-E2" />
+          <input value={form.norma} onChange={set('norma')} {...val('norma')} placeholder="ej. TL 528 D-21, WSS-M1P83-E2" />
         </label>
         <label>Apartado de la norma
-          <input value={form.apartado} onChange={set('apartado')} placeholder="ej. 3.5.1" />
+          <input value={form.apartado} onChange={set('apartado')} {...val('apartado')} placeholder="ej. 3.5.1" />
         </label>
         <label>Equipo utilizado
           <select value={form.equipo_id} onChange={set('equipo_id')}>

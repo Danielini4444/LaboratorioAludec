@@ -1,31 +1,50 @@
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
-const session = require('express-session');
-const PgSession = require('connect-pg-simple')(session);
 const { pool } = require('./db');
+
+// standalone = login local con sesión (lo de siempre); sso = login central del
+// QMS: JWT del IdP en cada request, sin sesión ni contraseñas locales (login.md §3).
+const AUTH_MODE = process.env.AUTH_MODE || 'standalone';
 
 const app = express();
 app.use(express.json());
-app.use(session({
-  store: new PgSession({ pool, createTableIfMissing: true }),
-  secret: process.env.SESSION_SECRET || 'cambia-este-secreto',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 8 * 60 * 60 * 1000 }
-}));
 
-// Mientras un usuario deba cambiar su contraseña, solo puede usar /api/auth
-// (login, me, logout, cambiar-password). Todo lo demás queda bloqueado.
-app.use('/api', (req, res, next) => {
-  const u = req.session.user;
-  if (u && u.debe_cambiar_password && !req.path.startsWith('/auth/')) {
-    return res.status(403).json({ error: 'Debes cambiar tu contraseña antes de continuar', code: 'CAMBIO_REQUERIDO' });
-  }
-  next();
+// Configuración pública: el client la lee al arrancar para saber en qué modo
+// corre el sistema y a qué IdP redirigir.
+app.get('/api/config', (req, res) => {
+  res.json({
+    auth_mode: AUTH_MODE,
+    sso: { url: process.env.SSO_URL, realm: process.env.SSO_REALM, client_id: 'lab' }
+  });
 });
 
-app.use('/api/auth', require('./routes/auth'));
+if (AUTH_MODE === 'sso') {
+  app.use('/api', require('./verificarJwt'));
+  app.use('/api/auth', require('./routes/authSso'));
+} else {
+  const session = require('express-session');
+  const PgSession = require('connect-pg-simple')(session);
+  app.use(session({
+    store: new PgSession({ pool, createTableIfMissing: true }),
+    secret: process.env.SESSION_SECRET || 'cambia-este-secreto',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 8 * 60 * 60 * 1000 }
+  }));
+
+  // Mientras un usuario deba cambiar su contraseña, solo puede usar /api/auth
+  // (login, me, logout, cambiar-password). Todo lo demás queda bloqueado.
+  app.use('/api', (req, res, next) => {
+    const u = req.session.user;
+    if (u && u.debe_cambiar_password && !req.path.startsWith('/auth/')) {
+      return res.status(403).json({ error: 'Debes cambiar tu contraseña antes de continuar', code: 'CAMBIO_REQUERIDO' });
+    }
+    next();
+  });
+
+  app.use('/api/auth', require('./routes/auth'));
+}
 app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/areas', require('./routes/areas'));
 app.use('/api/clientes', require('./routes/clientes'));

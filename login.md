@@ -276,17 +276,25 @@ Aunque hoy se entregue en `standalone`, todo sistema del QMS debe cumplir:
 - Modelo de roles local claro (mapeable según §6).
 - Inmutabilidad post-aprobación + anulación con traza + hash SHA-256 de evidencia.
 
-**Faltaría para `AUTH_MODE=sso` (no hacer hasta que exista el IdP):**
-- `ALTER TABLE usuarios ADD COLUMN external_id text UNIQUE;`
-- Middleware `verificarJWT` (lib `jsonwebtoken` + cliente JWKS) que, en `sso`,
-  reemplace a `express-session`: verifica (incl. `aud`), resuelve identidad con
-  caché y escribe solo en alta/cambio (§5).
-- Archivo de mapeo `rolToken → { rol, area_nombre }` (tabla §6) y `SYSTEM_ID='lab'`.
-- Cliente: saltar `Login.jsx` en modo sso y adjuntar el Bearer en `api.js`.
-- CORS si el front lo sirve el shell desde otro origen.
+**El modo `AUTH_MODE=sso` ya está implementado** (el IdP existe: Keycloak, en el
+repo hermano `qms-login`; ver su README):
+- Migración `014_sso_external_id.sql`: `external_id` UNIQUE + `password_hash`
+  nullable con CHECK (los usuarios JIT no tienen contraseña local).
+- `server/src/verificarJwt.js`: verifica RS256 vía JWKS (`jsonwebtoken` +
+  `jwks-rsa`), valida `iss`/`aud === SYSTEM_ID`/`exp` y arma `req.session.user`
+  con la misma forma que el login local.
+- `server/src/espejoUsuarios.js`: resolución `sub → usuarios.id` con caché (TTL
+  5 min), adopción por `usuario` para cuentas pre-SSO, INSERT solo al primer
+  encuentro, UPDATE solo si el IdP cambió nombre/rol (§5).
+- `server/src/rolesSso.js`: `SYSTEM_ID='lab'` + el mapeo de la tabla §6
+  (extendida con `auditor_admin` y `solicitante`).
+- Cliente: `client/src/sso.js` (keycloak-js, PKCE S256, token en memoria),
+  bootstrap por `/api/config` en `main.jsx`, Bearer en `api.js`, pantalla
+  "Sin acceso" en vez de `Login.jsx` cuando el token no trae rol de lab.
+- Pendiente si el shell sirviera el front desde otro origen: CORS (hoy no aplica).
 
-> Hoy lab corre **standalone** y así se queda hasta que el IdP esté listo. El login
-> local actual convive con el futuro `sso` sin bifurcar el código.
+> lab conmuta por `AUTH_MODE` en `server/.env` (default `standalone`). Ambos
+> modos conviven sin bifurcar el código: se cambió la puerta, no la casa (§2).
 
 ---
 

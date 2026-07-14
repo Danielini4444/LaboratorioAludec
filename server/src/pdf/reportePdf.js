@@ -8,10 +8,13 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 
 const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
-const AZUL = '#5b9bd5';
-const FONDO = '#dde9f5';
-const BORDE = '#9dc3e6';
-const GRIS = '#5b6b84';
+const LOGO = path.join(__dirname, '..', '..', 'assets', 'logo.png');
+// Paleta styles.md §7: gris oscuro de marca (naranja se reserva para acentos).
+const PRIMARIO = '#1d252d';
+const PRIMARIO_HOVER = '#333f48';
+const FONDO = '#eceded';
+const BORDE = '#d0d3d4';
+const GRIS = '#5b6770';
 const MARGEN = 50;
 const ANCHO_UTIL = 612 - 2 * MARGEN;
 const LIMITE_Y = 700;
@@ -89,10 +92,12 @@ module.exports = function generarReportePdf(stream, reporte) {
   };
 
   // ===== Encabezado =====
-  doc.rect(MARGEN, MARGEN, ANCHO_UTIL - 150, 38).fillAndStroke(AZUL, AZUL);
-  doc.fillColor('white').font('Helvetica-Bold').fontSize(13)
-    .text('ALUDEC', MARGEN + 8, MARGEN + 12);
-  doc.fontSize(12).text('INFORME DE ENSAYOS / TEST REPORT', MARGEN + 90, MARGEN + 13, { width: ANCHO_UTIL - 260, align: 'center' });
+  // logo CIE Aludec sobre el blanco + banda de título
+  try { doc.image(LOGO, MARGEN, MARGEN + 5, { height: 28 }); } catch { /* sin logo: solo banda */ }
+  const bandaX = MARGEN + 115;
+  doc.rect(bandaX, MARGEN, ANCHO_UTIL - 150 - 115, 38).fillAndStroke(PRIMARIO, PRIMARIO);
+  doc.fillColor('white').font('Helvetica-Bold')
+    .fontSize(12).text('INFORME DE ENSAYOS / TEST REPORT', bandaX + 6, MARGEN + 13, { width: ANCHO_UTIL - 150 - 115 - 12, align: 'center' });
   const fx = MARGEN + ANCHO_UTIL - 145;
   doc.rect(fx, MARGEN, 145, 38).strokeColor('black').lineWidth(1.2).stroke();
   doc.fillColor(GRIS).font('Helvetica').fontSize(6.5).text('Nº Ensayo / Report No.', fx + 4, MARGEN + 5, { width: 137, align: 'center' });
@@ -102,7 +107,7 @@ module.exports = function generarReportePdf(stream, reporte) {
   doc.y = MARGEN + 46;
 
   doc.fontSize(7).fillColor(GRIS).font('Helvetica')
-    .text(`Código / Code: FM-15-30   ·   Emisión / Issue date: ${reporte.fecha_emision ? fecha(reporte.fecha_emision) : 'pendiente / pending'}   ·   ALUDEC AUTOMOCION`,
+    .text(`Código / Code: FM-15-30   ·   Emisión / Issue date: ${reporte.fecha_emision ? fecha(reporte.fecha_emision) : 'pendiente / pending'}   ·   CIE ALUDEC AUTOMOCION`,
       MARGEN, doc.y, { width: ANCHO_UTIL, align: 'center' });
   doc.fillColor('black');
   doc.y += 10;
@@ -136,7 +141,7 @@ module.exports = function generarReportePdf(stream, reporte) {
     salto(110);
     // banner: Norma - Apartado Ensayo (como "TL 528 D-21 - 3.5.1 Grind Saw Test")
     const titulo = [p.norma, [p.apartado, p.ensayo].filter(Boolean).join(' ')].filter(Boolean).join(' - ');
-    doc.rect(MARGEN, doc.y, ANCHO_UTIL, 16).fillAndStroke('#3a4456', '#3a4456');
+    doc.rect(MARGEN, doc.y, ANCHO_UTIL, 16).fillAndStroke(PRIMARIO_HOVER, PRIMARIO_HOVER);
     doc.fillColor('white').font('Helvetica-Bold').fontSize(8.5)
       .text(`Ensayo / Test ${p.numero}:  ${titulo}`, MARGEN + 6, doc.y + 4, { width: ANCHO_UTIL - 70 });
     if (p.valoracion) {
@@ -205,7 +210,7 @@ module.exports = function generarReportePdf(stream, reporte) {
     .text('CONCLUSIÓN / CONCLUSION', MARGEN + 6, doc.y + 4);
   doc.y += 8;
   if (reporte.conclusion) {
-    doc.font('Helvetica-Bold').fontSize(13).fillColor(cumple ? '#1a7a2e' : '#b00020')
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(cumple ? '#15803d' : '#b91c1c')
       .text(cumple ? 'CUMPLE / PASS' : 'NO CUMPLE / FAIL', MARGEN, doc.y);
     doc.fillColor('black');
     doc.y += 4;

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { api } from './api.js';
+import { modoAuth, cerrarSesion } from './sso.js';
 import Login from './pages/Login.jsx';
 import Registros from './pages/Registros.jsx';
 import NuevoRegistro from './pages/NuevoRegistro.jsx';
@@ -70,6 +71,20 @@ const IconoAdmin = () => (
   </svg>
 );
 
+// En modo sso el usuario ya se autenticó en el login central; si lab responde
+// 403 es que nadie le ha asignado un rol de este sistema en el panel del QMS.
+function SinAcceso() {
+  return (
+    <div className="pantalla-carga">
+      <div>
+        <p>Tu cuenta no tiene acceso al sistema de laboratorio.</p>
+        <p>Solicita el rol a un administrador del QMS.</p>
+        <button className="link" onClick={cerrarSesion}>Cerrar sesión</button>
+      </div>
+    </div>
+  );
+}
+
 function Layout({ children }) {
   const { user, logout } = useAuth();
   const veAdmin = user.rol === 'admin' || user.rol === 'auditor_admin';
@@ -77,9 +92,9 @@ function Layout({ children }) {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="marca">
-          <h1>ALUDEC</h1>
-          <div className="sub">Laboratorio</div>
+        <div className="marca" style={{ backgroundColor: 'white' }}>
+          <img className="logo" src="/logo.png" alt="ALUDEC" style={{ height: '40px' }}/>
+          <div className="sub" style={{ fontSize: '15px', marginTop: '10px' }}>Laboratorio ALUDEC</div>
         </div>
         <nav>
           <NavLink to="/solicitudes"><IconoSolicitud /> Solicitud de ensayos</NavLink>
@@ -124,6 +139,7 @@ export default function App() {
   };
 
   const logout = async () => {
+    if (modoAuth === 'sso') return cerrarSesion(); // redirige al login central
     await api('/auth/logout', { method: 'POST' });
     setUser(null);
     navigate('/login');
@@ -136,9 +152,13 @@ export default function App() {
   return (
     <AuthContext.Provider value={{ user, login, logout, refrescar }}>
       {!user ? (
-        <Routes>
-          <Route path="*" element={<Login />} />
-        </Routes>
+        modoAuth === 'sso' ? (
+          <SinAcceso />
+        ) : (
+          <Routes>
+            <Route path="*" element={<Login />} />
+          </Routes>
+        )
       ) : user.debe_cambiar_password ? (
         <CambiarPassword />
       ) : (
