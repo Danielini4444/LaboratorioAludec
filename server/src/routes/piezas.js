@@ -27,7 +27,7 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireRol('solicitante'), async (req, res, next) => {
+router.post('/', requireRol('solicitante', 'admin_area'), async (req, res, next) => {
   try {
     const { referencia, denominacion, cliente_id } = req.body;
     if (!referencia || !denominacion || !cliente_id) {
@@ -45,7 +45,7 @@ router.post('/', requireRol('solicitante'), async (req, res, next) => {
   }
 });
 
-router.put('/:id', requireRol('solicitante'), async (req, res, next) => {
+router.put('/:id', requireRol('solicitante', 'admin_area'), async (req, res, next) => {
   try {
     const { referencia, denominacion, cliente_id, activa } = req.body;
     const { rows } = await query(

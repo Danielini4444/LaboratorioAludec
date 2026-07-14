@@ -48,7 +48,7 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireRol(), async (req, res, next) => {
+router.post('/', requireRol('admin_area'), async (req, res, next) => {
   try {
     const { cliente_id, norma } = req.body;
     if (!cliente_id || !norma) return res.status(400).json({ error: 'Cliente y norma son requeridos' });
@@ -66,7 +66,7 @@ router.post('/', requireRol(), async (req, res, next) => {
   }
 });
 
-router.put('/:id(\\d+)', requireRol(), async (req, res, next) => {
+router.put('/:id(\\d+)', requireRol('admin_area'), async (req, res, next) => {
   try {
     const limites = req.body.limites !== undefined ? validarLimites(req.body.limites) : null;
     // editar norma o límites a mano la protege de que el importador la pise
