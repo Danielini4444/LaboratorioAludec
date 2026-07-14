@@ -125,6 +125,26 @@ npm start         # un solo proceso en http://localhost:3000 (sirve API + interf
 
 Requiere PostgreSQL corriendo y accesible con la `DATABASE_URL` que pongas en `server/.env`.
 
+### Migrar datos ya capturados (en vez de `npm run seed`)
+
+Si ya hay trabajo real en una base existente (registros/reportes capturados o firmados, catálogos cargados), se **migra la base completa** en vez de partir de cero — `npm run seed` no aplica en este caso, se saltaría directo a migrar el respaldo:
+
+En la máquina de origen (donde está la base actual):
+
+```
+pg_dump -U <usuario> -h localhost -d lab -F c -f lab_respaldo.dump
+```
+
+La evidencia fotográfica **no** va en el dump — vive en `server/uploads/`, hay que copiar esa carpeta aparte (o comprimirla) junto con el `.dump`.
+
+En el servidor nuevo, después de crear la base vacía y configurar `server/.env` (pero **antes** de `npm run migrate`/`seed`):
+
+```
+pg_restore -U <usuario> -h localhost -d lab --no-owner --no-privileges lab_respaldo.dump
+```
+
+`--no-owner --no-privileges` evita fallos si el usuario/rol de Postgres no se llama igual en el servidor nuevo. Después, copiar el contenido de `server/uploads/` de origen dentro de `server/uploads/` del proyecto ya clonado, y seguir con `npm run migrate` (confirma que el esquema está al día; no debería aplicar nada nuevo si el respaldo ya tenía todas las migraciones) → `npm run build` → `npm start`. Conviene verificar después que los conteos (`SELECT count(*) FROM piezas`, `clientes`, `registros_espesores`, `reportes_ensayo`) coincidan con los de origen.
+
 ### Para que otros equipos y celulares entren
 
 1. **`APP_URL` en `server/.env`** — la IP fija o nombre del servidor en la intranet (p. ej. `http://192.168.1.50:3000`). Sin esto, el sistema intenta adivinar la IP del servidor, lo que falla si tiene más de una red activa a la vez (ver "Firma digital y QR de verificación" más abajo).
