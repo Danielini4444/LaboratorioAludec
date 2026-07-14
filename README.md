@@ -1,4 +1,4 @@
-# Sistema de Laboratorio — ALUDEC (alpha 0.1)
+# Sistema de Laboratorio — ALUDEC (alpha 0.14)
 
 Software interno del laboratorio de **ALUDEC Automoción** (cromado de emblemas). Hecho **a la medida de los formatos en papel del laboratorio** — sin plantillas ni módulos configurables: cada formato es su propia pantalla, su propia tabla y su propio PDF.
 
@@ -8,6 +8,7 @@ Módulos:
 2. **Test de cromado** (Metrología, folios `Ens_####`) — formato FM-15-30.
 3. **Planes de prueba** (Metrología) — el plan de validación de cromado por cliente, que se precarga a los reportes.
 4. **Imprimir por OF** — junta en un solo PDF lo capturado bajo una orden de fabricación.
+5. **Administración** — usuarios, catálogo de piezas, normas por cliente, equipos y clientes, todo editable por fila.
 
 ---
 
@@ -43,18 +44,28 @@ Módulos:
 - Marca qué documentos imprimir — y dentro de cada test de cromado, **qué pruebas** — y sale **un solo PDF**: primero los informes FM-15-30, luego los registros FM-15-01-03 de anexo (como el paquete real Ens_2384).
 - Smoke test manual del armado: `node server/scripts/prueba-of.js`.
 
+## 5. Administración
+
+- Pestañas **Usuarios, Piezas, Normas, Equipos y Clientes**. Solo el **admin global** edita; el auditor admin la ve en solo lectura.
+- Todo se edita **por fila** (botón *Editar* → Guardar/Cancelar): usuarios (nombre, rol y área; contraseña y activar/desactivar con sus propios botones), piezas (referencia, denominación y cliente), equipos (nombre, ID interno y fecha de calibración — se pueden vaciar), clientes (renombrar) y normas (límites por cliente).
+- Nada se borra de los catálogos: usuarios, piezas, equipos y normas se **desactivan** (dejan de aparecer para capturar, pero lo histórico los conserva).
+
 ---
 
 ## Carga de fotos
 
 Dentro de los formularios (registro de espesores y pruebas de cromado) hay una **zona de carga**: se sueltan o se eligen fotos, **de a una o varias a la vez**, y se van **acumulando** (no se reemplaza la selección). Cada miniatura se puede quitar antes de guardar. Solo JPG/PNG (lo que el PDF puede incrustar); hasta 10 por envío.
 
-## Firmas en los PDF
+## Firma digital y QR de verificación
 
-Ningún PDF sale **firmado por sí solo**:
+Los documentos **aprobados** (registro de espesores y reporte de ensayo) se pueden **firmar digitalmente**. Firman **solo admin, admin de Químico y admin de Metrología**:
 
-- **FM-15-01-03** (thickness): muestra el **responsable** (ISSUED BY); APPROVED BY queda en blanco para firma a mano.
-- **FM-15-30** (cromado): se conserva el **RESPONSABLE** de cada prueba (quién la ejecutó, con su equipo y tiempos) y la conclusión; **no** lleva bloque de firmas al final.
+- La firma guarda **quién y cuándo**, más un **token HMAC-SHA256** del documento con el secreto del servidor (`FIRMA_SECRET` o `SESSION_SECRET` en `server/.env`): no se puede fabricar una firma válida sin el secreto.
+- El **PDF firmado** lleva el bloque *FIRMA DIGITAL / DIGITAL SIGNATURE*: firmante, fecha/hora, ID de firma y **código QR**. En el FM-15-01-03, el APPROVED BY deja de ir en blanco y lleva al firmante. La impresión por OF también incluye el QR de cada documento firmado.
+- El QR apunta a la **página pública de verificación** (`/api/verificar/…`, sin sesión — se escanea desde cualquier teléfono): con token correcto muestra **FIRMA VÁLIDA** con folio, cliente, referencia y firmante; si el documento se **anuló** después de firmarse, avisa que la firma ya no lo ampara; con token incorrecto muestra **FIRMA NO VÁLIDA** sin revelar ningún dato.
+- En producción conviene fijar `APP_URL` en `server/.env` (p. ej. `http://<IP-del-servidor>:3000`) para que los QR impresos siempre apunten a la dirección fija del servidor.
+
+Sin firma digital, los PDF salen como antes: **FM-15-01-03** con el responsable en ISSUED BY y APPROVED BY en blanco para firma a mano; **FM-15-30** con el RESPONSABLE de cada prueba y sin bloque de firmas al final.
 
 ---
 
@@ -62,7 +73,8 @@ Ningún PDF sale **firmado por sí solo**:
 
 Endurecimiento pensado para que los registros aguanten una auditoría IATF:
 
-- **Anulación con traza en vez de borrado.** Los registros y reportes **no se borran**: el admin los **anula con un motivo obligatorio**, y quedan **visibles y marcados ANULADO** (con quién y cuándo). El PDF sale con marca de agua *ANULADO / VOID*. Lo aprobado y lo anulado es inmutable (no se edita, no admite fotos).
+- **Anulación con traza** (la vía normal): el admin **anula con un motivo obligatorio** y el documento queda **visible y marcado ANULADO** (con quién y cuándo). El PDF sale con marca de agua *ANULADO / VOID*. Lo aprobado y lo anulado es inmutable (no se edita, no admite fotos).
+- **Borrado definitivo** (solo admin, con confirmación): elimina el documento **por completo** — pruebas, piezas, mediciones y fotos, también del disco — y aplica **aunque esté aprobado o firmado**. Es para capturas de prueba o duplicados; a diferencia de Anular, **no deja traza**. El QR de un PDF impreso de un documento borrado da FIRMA NO VÁLIDA.
 - **Sello de aprobación completo.** Tanto reportes como registros guardan **quién aprobó y cuándo** (`aprobado_por` / `aprobado_en`).
 - **Cambio de contraseña obligatorio** en el primer ingreso: los usuarios nacen con la contraseña por defecto conocida y el sistema **bloquea todo** hasta que la cambian.
 - **Hash SHA-256 de la evidencia.** Cada foto guarda el hash de su archivo al subirse. El script `node server/scripts/verificar-evidencia.js` revisa que cada imagen exista en disco y no haya cambiado, y reporta faltantes o alteradas (rellena el hash de las imágenes antiguas).
@@ -79,10 +91,10 @@ Endurecimiento pensado para que los registros aguanten una auditoría IATF:
 | Área / rol | Puede |
 |---|---|
 | **Químico** (usuario) | Capturar y editar registros de espesores; subir/quitar fotos |
-| **Químico** (admin de área) | Lo anterior + **aprobar** registros |
+| **Químico** (admin de área) | Lo anterior + **aprobar** registros y **firmar** documentos |
 | **Metrología** (usuario) | Crear/editar reportes de cromado y sus pruebas; crear/borrar planes; fotos |
-| **Metrología** (admin de área) | Lo anterior + **aprobar** reportes |
-| **admin** (global) | Todo, incluido **anular** (con motivo) registros y reportes |
+| **Metrología** (admin de área) | Lo anterior + **aprobar** reportes y **firmar** documentos |
+| **admin** (global) | Todo: **firmar**, **anular** (con motivo), **borrar definitivamente** y editar Administración |
 | **auditor / auditor admin** | Solo lectura (el segundo además ve Administración) |
 | solicitante | Sin función en esta versión |
 
@@ -129,6 +141,6 @@ Los importadores son idempotentes. Para corregir un límite puntual, también se
 
 ## Estructura
 
-- `server/` — API Express + PostgreSQL. Migraciones en `server/migrations/`, PDFs en `server/src/pdf/` (`registroPdf.js`, `reportePdf.js`), rutas en `server/src/routes/`, fotos en `server/uploads/`.
+- `server/` — API Express + PostgreSQL. Migraciones en `server/migrations/`, PDFs en `server/src/pdf/` (`registroPdf.js`, `reportePdf.js`), rutas en `server/src/routes/` (la verificación pública de firmas vive en `verificar.js`; la generación de tokens y QR en `src/firma.js`), fotos en `server/uploads/`.
 - `client/` — interfaz React (Vite). El servidor sirve `client/dist/` compilado.
 - `info reportes/` — formatos de referencia del laboratorio (FM-15-30, FM-15-01-03, sistema Access viejo).
