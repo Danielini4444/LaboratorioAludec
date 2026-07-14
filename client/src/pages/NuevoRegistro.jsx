@@ -17,6 +17,7 @@ const PIEZA_VACIA = (numero, densidad) => ({
   ni_sb: '', ni_br: '', ni_mps: '', dp_mp_br: '', dp_br_sb: '',
   ni_sb_pct: '', ni_br_pct: '',
   poros: '',
+  fotos_espesores: [],
   fotos_step: [],
   fotos_poros: []
 });
@@ -99,7 +100,7 @@ export default function NuevoRegistro() {
           step_punto: txt(p.step_punto), ni_sb: txt(p.ni_sb), ni_br: txt(p.ni_br), ni_mps: txt(p.ni_mps),
           dp_mp_br: txt(p.dp_mp_br), dp_br_sb: txt(p.dp_br_sb), poros: txt(p.poros),
           ni_sb_pct: txt(p.ni_sb_pct), ni_br_pct: txt(p.ni_br_pct),
-          fotos_step: [], fotos_poros: []
+          fotos_espesores: [], fotos_step: [], fotos_poros: []
         })));
         setResultadoManual(reg.resultado || '');
         setCargandoReg(false);
@@ -230,7 +231,7 @@ export default function NuevoRegistro() {
         norma: espec ? espec.norma : (normaDeseada.current || null),
         fecha_produccion: cabecera.fecha_produccion || null,
         resultado: resultado || null,
-        piezas: piezas.map(({ fotos_step, fotos_poros, ...p }) => p) // conserva id en edición
+        piezas: piezas.map(({ fotos_espesores, fotos_step, fotos_poros, ...p }) => p) // conserva id en edición
       };
 
       if (edicion) {
@@ -244,6 +245,7 @@ export default function NuevoRegistro() {
       for (let i = 0; i < piezas.length; i++) {
         const piezaCreada = (registro.piezas || []).find(pc => pc.numero === i + 1);
         if (!piezaCreada) continue;
+        await subirFotos(registro.id, piezas[i].fotos_espesores, { pieza_id: piezaCreada.id, seccion: 'espesores' });
         await subirFotos(registro.id, piezas[i].fotos_step, { pieza_id: piezaCreada.id, seccion: 'step' });
         await subirFotos(registro.id, piezas[i].fotos_poros, { pieza_id: piezaCreada.id, seccion: 'poros' });
       }
@@ -360,6 +362,11 @@ export default function NuevoRegistro() {
             </tbody>
           </table>
           <button type="button" className="chico secundario" onClick={() => agregarPunto(i)}>+ Punto de medición</button>
+
+          {!edicion && (
+            <CargaFotos titulo="Fotos de espesores"
+              archivos={p.fotos_espesores} onCambio={l => setPieza(i, { fotos_espesores: l })} />
+          )}
 
           <h4 className="sub-seccion">STEP y poros</h4>
           <div className="fila">

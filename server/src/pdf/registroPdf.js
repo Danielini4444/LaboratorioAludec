@@ -258,6 +258,16 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
       { texto: m.cu, rojo: fueraDeLimite(espec, 'cu', m.cu) },
       m.comentario || ''
     ]));
+
+    // fotos de espesores de la pieza
+    const fotosEsp = fotosDe(pieza.id, 'espesores');
+    if (fotosEsp.length) {
+      if (doc.y + 140 > LIMITE_Y) doc.addPage(); // etiqueta y foto juntas
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#5b6b84')
+        .text(`Thickness photos — Piece ${pieza.numero}:`, MARGEN, doc.y);
+      doc.fillColor('black');
+      filaFotos(fotosEsp, 160, 120);
+    }
   }
 
   leyendaYObservaciones(doc, registro);

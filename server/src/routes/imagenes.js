@@ -31,7 +31,8 @@ const subir = multer({
 const router = express.Router();
 
 // Sube una o varias fotos a un registro de espesores. Campos opcionales:
-// seccion ('muestra' | 'step' | 'poros') y pieza_id (para step/poros).
+// seccion ('muestra' | 'step' | 'poros' | 'espesores') y pieza_id (para las
+// secciones por pieza: step, poros, espesores).
 router.post('/registro/:registroId', requireQuimico(), subir.array('imagenes'), async (req, res, next) => {
   const limpiar = () => { for (const f of req.files || []) fs.unlink(f.path, () => {}); };
   try {
@@ -44,7 +45,7 @@ router.post('/registro/:registroId', requireQuimico(), subir.array('imagenes'), 
       limpiar();
       return res.status(400).json({ error: 'El registro ya está cerrado (aprobado o anulado) y no admite cambios' });
     }
-    const seccion = ['muestra', 'step', 'poros'].includes(req.body.seccion) ? req.body.seccion : 'muestra';
+    const seccion = ['muestra', 'step', 'poros', 'espesores'].includes(req.body.seccion) ? req.body.seccion : 'muestra';
     let piezaId = null;
     if (req.body.pieza_id) {
       const { rows: piezas } = await query(

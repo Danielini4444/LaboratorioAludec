@@ -287,6 +287,11 @@ export default function RegistroDetalle() {
             </div>
           )}
           <FotosSeccion
+            registroId={registro.id} piezaId={p.id} seccion="espesores"
+            titulo="Fotos de espesores" imagenes={fotosDe(p.id, 'espesores')}
+            {...fotosProps}
+          />
+          <FotosSeccion
             registroId={registro.id} piezaId={p.id} seccion="step"
             titulo="Fotos STEP (gráficas)" imagenes={fotosDe(p.id, 'step')}
             {...fotosProps}
