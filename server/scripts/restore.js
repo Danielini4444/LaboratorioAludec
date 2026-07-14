@@ -5,8 +5,11 @@
 //
 // Uso: node scripts/restore.js <respaldo.dump> [uploads.zip] [--force]
 //   PG_BIN_DIR=... si pg_restore/createdb no están en el PATH del sistema
-//   --force        restaura aunque la base destino ya tenga tablas
-//                  (por default se aborta, para no pisar datos por accidente)
+//   --force        restaura aunque la base destino ya tenga usuarios capturados
+//                  (por default se aborta, para no pisar datos por accidente;
+//                  una base recién migrada pero sin datos —el caso normal de
+//                  un servidor nuevo tras "npm run migrate"— SÍ se sobrescribe
+//                  sin pedir --force, ahí no hay nada que perder)
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -58,25 +61,32 @@ async function main() {
   }
   await admin.end();
 
-  // 2. abortar si la base destino ya tiene tablas, salvo --force
+  // 2. abortar si la base destino ya tiene DATOS reales, salvo --force.
+  // Una base recién migrada (esquema creado por "npm run migrate", sin
+  // filas) no cuenta como "con datos" — ahí no hay nada que proteger, y es
+  // justo el estado normal de un servidor nuevo antes de restaurar.
   const destino = new Client({ host, port, user, password, database: dbName });
   await destino.connect();
-  const { rows: tablas } = await destino.query(
-    `SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public'`
-  );
+  let usuariosExistentes = 0;
+  try {
+    const { rows } = await destino.query('SELECT count(*)::int AS n FROM usuarios');
+    usuariosExistentes = rows[0].n;
+  } catch { /* la tabla "usuarios" no existe todavía: base limpia */ }
   await destino.end();
-  if (tablas[0].n > 0 && !forzar) {
+  if (usuariosExistentes > 0 && !forzar) {
     throw new Error(
-      `La base "${dbName}" ya tiene ${tablas[0].n} tabla(s) — no se restaura encima para no perder datos. ` +
+      `La base "${dbName}" ya tiene ${usuariosExistentes} usuario(s) capturado(s) — no se restaura encima para no perder datos. ` +
       'Si de verdad quieres continuar (sobrescribe lo que choque), vuelve a correr agregando --force.'
     );
   }
 
-  // 3. pg_restore
+  // 3. pg_restore — --clean --if-exists para que funcione igual si la base
+  // llegó vacía de verdad o si ya tiene el esquema (creado por migrate):
+  // borra y recrea cada objeto en vez de fallar por "ya existe".
   console.log('Restaurando el respaldo…');
   execFileSync(herramienta(binDir, 'pg_restore'), [
     '-h', host, '-p', port, '-U', user, '-d', dbName,
-    '--no-owner', '--no-privileges', '--exit-on-error', dumpFile
+    '--no-owner', '--no-privileges', '--clean', '--if-exists', '--exit-on-error', dumpFile
   ], { stdio: 'inherit', env: envConPassword });
 
   // 4. fotos
