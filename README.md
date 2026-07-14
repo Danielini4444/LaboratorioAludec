@@ -137,13 +137,15 @@ pg_dump -U <usuario> -h localhost -d lab -F c -f lab_respaldo.dump
 
 La evidencia fotográfica **no** va en el dump — vive en `server/uploads/`, hay que copiar esa carpeta aparte (o comprimirla) junto con el `.dump`.
 
-En el servidor nuevo, después de crear la base vacía y configurar `server/.env` (pero **antes** de `npm run migrate`/`seed`):
+En el servidor nuevo, después de `git clone` y de configurar `server/.env` (pero **en vez de** `npm run migrate`/`seed`):
 
 ```
-pg_restore -U <usuario> -h localhost -d lab --no-owner --no-privileges lab_respaldo.dump
+npm run restore -- lab_respaldo.dump uploads.zip
 ```
 
-`--no-owner --no-privileges` evita fallos si el usuario/rol de Postgres no se llama igual en el servidor nuevo. Después, copiar el contenido de `server/uploads/` de origen dentro de `server/uploads/` del proyecto ya clonado, y seguir con `npm run migrate` (confirma que el esquema está al día; no debería aplicar nada nuevo si el respaldo ya tenía todas las migraciones) → `npm run build` → `npm start`. Conviene verificar después que los conteos (`SELECT count(*) FROM piezas`, `clientes`, `registros_espesores`, `reportes_ensayo`) coincidan con los de origen.
+Un solo comando: crea la base si no existe, restaura el respaldo, descomprime las fotos en `server/uploads/` y al final imprime cuántas filas quedaron en cada tabla para comparar contra el origen. Por seguridad **se niega a correr si la base destino ya tiene tablas** (para no pisar datos sin querer) — si de verdad quieres sobrescribir, agrega `--force` al final. Si `pg_restore`/`createdb` no están en el PATH del sistema, indica la carpeta con `PG_BIN_DIR=<ruta al bin de PostgreSQL> npm run restore -- ...`.
+
+Después: `npm run migrate` (confirma que el esquema está al día; no debería aplicar nada nuevo si el respaldo ya tenía todas las migraciones) → `npm run build` → `npm start`.
 
 ### Para que otros equipos y celulares entren
 
