@@ -22,6 +22,13 @@ function fecha(d) {
   return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function fechaHora(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('es-MX', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+}
+
 // Nota: la fuente estándar de pdfkit (WinAnsi) no tiene ≥ ≤ Δ, por eso
 // los límites van con >= / <= y "Pot. Diff." en lugar de ΔP.
 // Los límites pueden ser absolutos ({min,max}) o porcentuales respecto al
@@ -129,9 +136,10 @@ function encabezado(doc, titulo, registro) {
     { titulo: 'ISSUED BY', ancho: 130 },
     { titulo: 'APPROVED BY', ancho: 130 },
     { titulo: 'CUSTOMER', ancho: 92 }
-  // ISSUED BY muestra al responsable; APPROVED BY se firma a mano (en blanco).
+  // ISSUED BY muestra al responsable; APPROVED BY lleva al firmante digital
+  // (si el registro está firmado) o queda en blanco para firma a mano.
   ], [[registro.reporte_no, fecha(registro.fecha_prueba), registro.realizado_por_nombre,
-       '', registro.cliente_nombre]], 14);
+       registro.firmado_por ? registro.firmado_por_nombre : '', registro.cliente_nombre]], 14);
 
   tabla(doc, MARGEN, [
     { titulo: 'REFERENCE', ancho: 110 },
@@ -160,6 +168,7 @@ function leyendaYObservaciones(doc, registro) {
 
 // opciones.secciones permite imprimir solo parte del formato (lo usa la
 // impresión por OF): { thickness, step, poros } — sin opciones va completo.
+// opciones.qr: PNG del QR de verificación cuando el registro está firmado.
 module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
   const secciones = { thickness: true, step: true, poros: true, ...(opciones.secciones || {}) };
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGEN, bottom: 55, left: MARGEN, right: MARGEN }, bufferPages: true });
@@ -352,6 +361,31 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
     }
 
     leyendaYObservaciones(doc, registro);
+  }
+
+  // ===== Firma digital =====
+  // Al final del documento, cuando el registro fue firmado (admin / admin de
+  // área): firmante, momento de la firma y QR a la verificación pública.
+  if (registro.firmado_por) {
+    if (doc.y + 100 > LIMITE_Y) doc.addPage();
+    doc.y += 6;
+    const yF = doc.y;
+    doc.rect(MARGEN, yF, ANCHO_UTIL, 92).strokeColor(BORDE).stroke();
+    if (opciones.qr) {
+      try { doc.image(opciones.qr, MARGEN + 8, yF + 8, { fit: [76, 76] }); } catch { /* sin QR: solo texto */ }
+    }
+    const tx = MARGEN + 96;
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('black')
+      .text('FIRMA DIGITAL / DIGITAL SIGNATURE', tx, yF + 10);
+    doc.font('Helvetica-Bold').fontSize(10)
+      .text(registro.firmado_por_nombre || '', tx, yF + 25);
+    doc.font('Helvetica').fontSize(8).fillColor('#5b6770')
+      .text(`Firmado digitalmente el / Digitally signed on: ${fechaHora(registro.firmado_en)}`, tx, yF + 41)
+      .text(`ID de firma / Signature ID: ${String(registro.firma_token || '').slice(0, 16).toUpperCase()}`, tx, yF + 53)
+      .text('Verifique la autenticidad escaneando el código QR / Verify authenticity by scanning the QR code',
+        tx, yF + 68, { width: ANCHO_UTIL - 104 });
+    doc.fillColor('black');
+    doc.y = yF + 100;
   }
 
   // ===== Pie de página =====

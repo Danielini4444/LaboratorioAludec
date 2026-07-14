@@ -275,6 +275,23 @@ export default function ReporteDetalle() {
   const captura = !aprobado && !anulado && esMetrologia(user);
   const puedeAprobar = !aprobado && !anulado && reporte.pruebas.length > 0 &&
     (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Metrología'));
+  // Firma digital: SOLO admin, admin de Químico y admin de Metrología,
+  // sobre reportes ya aprobados y no anulados.
+  const puedeFirmar = aprobado && !anulado && !reporte.firmado_por &&
+    (user.rol === 'admin' || user.rol === 'admin_area');
+
+  const firmar = async () => {
+    if (!await confirmar({
+      titulo: `Firmar reporte Ens_${reporte.folio}`,
+      mensaje: `Vas a firmar digitalmente como ${user.nombre}. La firma queda registrada con fecha y hora, y el PDF saldrá con un QR de verificación.`,
+      textoConfirmar: 'Firmar'
+    })) return;
+    try {
+      await api(`/reportes/${id}/firmar`, { method: 'PUT' });
+      avisar('Reporte firmado', 'ok');
+      cargar();
+    } catch (e) { avisar(e.message); }
+  };
 
   const anular = async () => {
     if (!motivo.trim()) return avisar('Indica el motivo de la anulación');
@@ -284,6 +301,20 @@ export default function ReporteDetalle() {
       setMotivo('');
       avisar('Reporte anulado', 'ok');
       cargar();
+    } catch (e) { avisar(e.message); }
+  };
+
+  // Borrado definitivo: solo admin, aplica aunque esté aprobado o firmado.
+  const borrar = async () => {
+    if (!await confirmar({
+      titulo: `Borrar reporte Ens_${reporte.folio}`,
+      mensaje: 'El reporte se borra DEFINITIVAMENTE con sus pruebas y fotos, sin dejar traza (a diferencia de Anular). Aplica aunque esté aprobado o firmado. Esta acción no se puede deshacer.',
+      textoConfirmar: 'Borrar definitivamente',
+      peligro: true
+    })) return;
+    try {
+      await api(`/reportes/${id}`, { method: 'DELETE' });
+      navigate('/reportes');
     } catch (e) { avisar(e.message); }
   };
 
@@ -304,6 +335,7 @@ export default function ReporteDetalle() {
             {reporte.conclusion
               ? <span className={`badge ${reporte.conclusion === 'CUMPLE' ? 'ok' : 'mal'}`}>{reporte.conclusion === 'CUMPLE' ? 'CUMPLE' : 'NO CUMPLE'}</span>
               : <span className="badge pendiente">En proceso</span>}
+            {reporte.firmado_por && <span className="badge ok">Firmado</span>}
             {anulado && <span className="badge mal">ANULADO</span>}
           </h2>
           <div className="subtitulo">
@@ -321,11 +353,23 @@ export default function ReporteDetalle() {
           ))}
           {captura && !agregando && <button onClick={() => setAgregando(true)}>Agregar prueba</button>}
           {puedeAprobar && !aprobando && <button onClick={() => setAprobando(true)}>Aprobar y emitir</button>}
+          {puedeFirmar && <button onClick={firmar}>Firmar</button>}
           {user.rol === 'admin' && !anulado && (
             <button className="secundario peligro" onClick={() => setAnulando(true)}>Anular</button>
           )}
+          {user.rol === 'admin' && (
+            <button className="secundario peligro" onClick={borrar}>Borrar</button>
+          )}
         </div>
       </div>
+
+      {reporte.firmado_por && (
+        <div className="meta">
+          Firmado digitalmente por <strong>{reporte.firmado_por_nombre}</strong>
+          {reporte.firmado_en && ` el ${new Date(reporte.firmado_en).toLocaleString('es-MX')}`}
+          {' '}· el PDF incluye el QR de verificación.
+        </div>
+      )}
 
       {anulado && (
         <div className="error">

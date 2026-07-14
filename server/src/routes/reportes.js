@@ -1,7 +1,12 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const { query } = require('../db');
-const { requireAuth, requireRol, requireArea } = require('../auth');
+const { requireAuth, requireRol, requireArea, requireFirmante } = require('../auth');
+const { generarToken, qrDeFirma } = require('../firma');
 const generarReportePdf = require('../pdf/reportePdf');
+
+const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
 
 const router = express.Router();
 const AREA = 'Metrología';
@@ -10,12 +15,13 @@ async function cargarReporte(id) {
   const { rows } = await query(
     `SELECT r.*, c.nombre AS cliente_nombre,
             ur.nombre AS realizado_por_nombre, ua.nombre AS aprobado_por_nombre,
-            uan.nombre AS anulado_por_nombre
+            uan.nombre AS anulado_por_nombre, uf.nombre AS firmado_por_nombre
      FROM reportes_ensayo r
      JOIN clientes c ON c.id = r.cliente_id
      JOIN usuarios ur ON ur.id = r.realizado_por
      LEFT JOIN usuarios ua ON ua.id = r.aprobado_por
      LEFT JOIN usuarios uan ON uan.id = r.anulado_por
+     LEFT JOIN usuarios uf ON uf.id = r.firmado_por
      WHERE r.id = $1`, [id]
   );
   const reporte = rows[0];
@@ -265,6 +271,26 @@ router.put('/:id(\\d+)/aprobar', requireArea(AREA, true), async (req, res, next)
   } catch (e) { next(e); }
 });
 
+// Firma digital: solo admin, admin de Químico y admin de Metrología, y solo
+// sobre reportes ya aprobados. El token queda en el documento y el QR del
+// PDF lleva a la página pública de verificación.
+router.put('/:id(\\d+)/firmar', requireFirmante, async (req, res, next) => {
+  try {
+    const fechaIso = new Date().toISOString();
+    const token = generarToken('reporte', req.params.id, req.session.user.id, fechaIso);
+    const { rows } = await query(
+      `UPDATE reportes_ensayo SET firmado_por = $1, firmado_en = $2, firma_token = $3
+       WHERE id = $4 AND aprobado_por IS NOT NULL AND anulado_por IS NULL AND firmado_por IS NULL
+       RETURNING id`,
+      [req.session.user.id, fechaIso, token, req.params.id]
+    );
+    if (!rows[0]) {
+      return res.status(400).json({ error: 'El reporte no existe, no está aprobado, está anulado o ya está firmado' });
+    }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 // Anulación con traza (en vez de borrado): el reporte queda visible y marcado.
 router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
   try {
@@ -280,13 +306,29 @@ router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Borrado DEFINITIVO del reporte completo (a diferencia de Anular, que deja
+// traza): solo admin, y aplica aunque el reporte esté aprobado o firmado.
+// Las pruebas e imágenes caen en cascada; las fotos se limpian del disco.
+router.delete('/:id(\\d+)', requireRol(), async (req, res, next) => {
+  try {
+    const { rows: fotos } = await query(
+      `SELECT i.archivo FROM prueba_imagenes i
+       JOIN reporte_pruebas p ON p.id = i.prueba_id WHERE p.reporte_id = $1`, [req.params.id]
+    );
+    const { rows } = await query('DELETE FROM reportes_ensayo WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Reporte no encontrado' });
+    for (const f of fotos) fs.unlink(path.join(UPLOADS, f.archivo), () => {});
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 router.get('/:id(\\d+)/pdf', requireAuth, async (req, res, next) => {
   try {
     const reporte = await cargarReporte(req.params.id);
     if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Ens_${reporte.folio}.pdf"`);
-    generarReportePdf(res, reporte);
+    generarReportePdf(res, reporte, { qr: await qrDeFirma(req, 'reporte', reporte) });
   } catch (e) { next(e); }
 });
 

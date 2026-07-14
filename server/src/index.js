@@ -19,6 +19,10 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// Verificación de firmas por QR: pública (se escanea desde un teléfono sin
+// sesión), por eso va montada ANTES del middleware de autenticación.
+app.use('/api/verificar', require('./routes/verificar'));
+
 if (AUTH_MODE === 'sso') {
   app.use('/api', require('./verificarJwt'));
   app.use('/api/auth', require('./routes/authSso'));
