@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../App.jsx';
+import { val } from '../validaciones.js';
 
 export default function Login() {
   const { login } = useAuth();
@@ -25,12 +26,12 @@ export default function Login() {
     <div className="login-fondo">
       <form className="login-caja" onSubmit={enviar}>
         <div className="login-marca">
-          <div className="logo">ALUDEC</div>
+          <img className="logo" src="/logo.png" alt="ALUDEC" />
           <div className="lema">Laboratorio · Registro de espesores y STEP</div>
         </div>
         <label>
           Usuario
-          <input value={usuario} onChange={e => setUsuario(e.target.value)} autoFocus required />
+          <input value={usuario} onChange={e => setUsuario(e.target.value)} autoFocus required {...val('usuario')} />
         </label>
         <label>
           Contraseña

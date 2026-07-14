@@ -20,6 +20,12 @@
       "port": 5173
     },
     {
+      "name": "client (preview verify)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "client", "run", "dev", "--", "--port", "5200"],
+      "port": 5200
+    },
+    {
       "name": "qms-portal",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "C:\\Users\\training\\Downloads\\qms-login\\portal", "run", "dev"],

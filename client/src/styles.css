@@ -1,16 +1,21 @@
 /* ===== Sistema de diseño — Laboratorio ALUDEC (Tailwind v4) ===== */
+/* Paleta y tokens: contrato en styles.md — naranja de marca como acento +
+   escala de grises fría. Sin azul. */
 @import "tailwindcss";
 
 /* Tokens del ecosistema: disponibles como utilidades (bg-primario, text-mal…) */
 @theme {
-  --color-fondo: #f2f5fa;
+  --color-fondo: #f4f5f5;
   --color-superficie: #ffffff;
-  --color-texto: #18243a;
-  --color-texto-suave: #5b6b84;
-  --color-borde: #e3e8f0;
-  --color-primario: #1d4ed8;
-  --color-primario-oscuro: #1e40af;
-  --color-primario-tinte: #e8effd;
+  --color-texto: #1d252d;
+  --color-texto-suave: #5b6770;
+  --color-borde: #d0d3d4;
+  --color-primario: #1d252d;
+  --color-primario-oscuro: #333f48;
+  --color-primario-tinte: #eceded;
+  --color-acento: #f18308;
+  --color-acento-suave: #faaa50;
+  --color-acento-tinte: #fdeeda;
   --color-ok: #15803d;
   --color-ok-fondo: #e7f6ed;
   --color-mal: #b91c1c;
@@ -19,7 +24,7 @@
   --color-alerta-fondo: #fdf3e0;
   --radius-base: 10px;
   --shadow-tarjeta: 0 1px 2px rgba(16, 24, 40, .05), 0 2px 6px rgba(16, 24, 40, .06);
-  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 /* Alias de nombres usados por las clases de componentes (un solo origen: @theme) */
@@ -32,6 +37,9 @@
   --primario: var(--color-primario);
   --primario-oscuro: var(--color-primario-oscuro);
   --primario-tinte: var(--color-primario-tinte);
+  --acento: var(--color-acento);
+  --acento-suave: var(--color-acento-suave);
+  --acento-tinte: var(--color-acento-tinte);
   --ok: var(--color-ok);
   --ok-fondo: var(--color-ok-fondo);
   --mal: var(--color-mal);
@@ -69,8 +77,9 @@
   /* Barra lateral */
   .sidebar {
     width: 240px;
-    background: linear-gradient(180deg, #0e1a30 0%, #14253f 100%);
-    color: #dbe3f0;
+    background: var(--superficie);
+    color: var(--texto);
+    border-right: 1px solid var(--borde);
     display: flex;
     flex-direction: column;
     position: sticky;
@@ -79,16 +88,16 @@
   }
   .sidebar .marca {
     padding: 22px 22px 18px;
-    border-bottom: 1px solid rgba(255, 255, 255, .08);
+    border-bottom: 1px solid var(--borde);
   }
-  .sidebar .marca h1 { font-size: 1.25em; color: #fff; margin: 0; letter-spacing: 0.02em; }
-  .sidebar .marca .sub { font-size: 0.78em; color: #8fa3c2; margin-top: 2px; }
+  .sidebar .marca .logo { display: block; height: 28px; width: auto; }
+  .sidebar .marca .sub { font-size: 0.78em; color: var(--texto-suave); margin-top: 2px; }
   .sidebar nav { display: flex; flex-direction: column; gap: 2px; padding: 14px 12px; flex: 1; }
   .sidebar nav a {
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #aebbd2;
+    color: var(--texto-suave);
     padding: 10px 12px;
     border-radius: 8px;
     font-weight: 500;
@@ -96,14 +105,14 @@
     transition: background .15s, color .15s;
   }
   .sidebar nav a svg { flex-shrink: 0; opacity: .85; }
-  .sidebar nav a:hover { background: rgba(255, 255, 255, .07); color: #fff; text-decoration: none; }
+  .sidebar nav a:hover { background: var(--primario-tinte); color: var(--texto); text-decoration: none; }
   .sidebar nav a.active { background: var(--primario); color: #fff; }
   .sidebar-user {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 16px;
-    border-top: 1px solid rgba(255, 255, 255, .08);
+    border-top: 1px solid var(--borde);
   }
   .sidebar-user .avatar {
     width: 38px;
@@ -118,10 +127,10 @@
     font-size: 0.9em;
     flex-shrink: 0;
   }
-  .sidebar-user .nombre { font-weight: 600; color: #fff; font-size: 0.92em; line-height: 1.2; }
-  .sidebar-user .rol { color: #8fa3c2; font-size: 0.78em; }
-  button.link { background: none; border: none; color: #8fa3c2; padding: 0; font-size: 0.78em; cursor: pointer; }
-  button.link:hover { color: #fff; text-decoration: underline; }
+  .sidebar-user .nombre { font-weight: 600; color: var(--texto); font-size: 0.92em; line-height: 1.2; }
+  .sidebar-user .rol { color: var(--texto-suave); font-size: 0.78em; }
+  button.link { background: none; border: none; color: var(--texto-suave); padding: 0; font-size: 0.78em; cursor: pointer; }
+  button.link:hover { color: var(--primario); text-decoration: underline; }
 
   /* Encabezados de página */
   .encabezado-pagina { margin-bottom: 20px; }
@@ -153,13 +162,13 @@
   }
   button:hover, .boton:hover { background: var(--primario-oscuro); text-decoration: none; }
   button:active, .boton:active { transform: translateY(1px); }
-  button:disabled { background: #9db3cf; cursor: default; transform: none; }
+  button:disabled { background: #a2aaad; cursor: default; transform: none; }
   button.secundario, .boton.secundario {
     background: #fff;
     color: var(--texto);
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--borde);
   }
-  button.secundario:hover, .boton.secundario:hover { background: #f4f7fb; }
+  button.secundario:hover, .boton.secundario:hover { background: var(--primario-tinte); }
   button.chico { padding: 5px 12px; font-size: 0.85em; font-weight: 500; }
 
   /* Tarjetas */
@@ -197,7 +206,7 @@
     gap: 5px;
     font-size: 0.88em;
     font-weight: 600;
-    color: #374761;
+    color: var(--texto);
   }
   .formulario .fila { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
   .formulario .fila > label, .formulario .fila > .campo-carga { flex: 1; min-width: 170px; }
@@ -206,7 +215,7 @@
 
   input, select, textarea {
     padding: 9px 12px;
-    border: 1px solid #c9d3e0;
+    border: 1px solid var(--borde);
     border-radius: 8px;
     font-size: 0.97em;
     font-family: inherit;
@@ -217,13 +226,13 @@
   input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--primario);
-    box-shadow: 0 0 0 3px rgba(29, 78, 216, .15);
+    box-shadow: 0 0 0 3px rgba(29, 37, 45, .15);
   }
-  input::placeholder { color: #9aa8bd; }
-  input[readonly] { background: #f4f7fb; color: var(--texto-suave); }
+  input::placeholder { color: #a2aaad; }
+  input[readonly] { background: var(--primario-tinte); color: var(--texto-suave); }
   .con-boton { display: flex; gap: 6px; }
   .con-boton input { flex: 1; }
-  label.inline { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 0.88em; font-weight: 600; color: #374761; }
+  label.inline { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 0.88em; font-weight: 600; color: var(--texto); }
   label.inline input, label.inline select { width: auto; }
 
   /* Tablas */
@@ -239,19 +248,19 @@
   }
   .tabla th {
     text-align: left;
-    background: #f6f8fc;
+    background: var(--primario-tinte);
     padding: 11px 14px;
     font-size: 0.78em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #5b6b84;
+    color: var(--texto-suave);
     border-bottom: 1px solid var(--borde);
   }
-  .tabla td { padding: 11px 14px; border-bottom: 1px solid #eef1f6; }
+  .tabla td { padding: 11px 14px; border-bottom: 1px solid var(--borde); }
   .tabla tbody tr:last-child td { border-bottom: none; }
   .tabla tbody tr { transition: background .1s; }
-  .tabla tbody tr:hover { background: #f8fafd; }
-  .tabla tr.inactivo td { color: #9aa8bd; }
+  .tabla tbody tr:hover { background: var(--primario-tinte); }
+  .tabla tr.inactivo td { color: #a2aaad; }
 
   .tabla.mediciones { box-shadow: none; margin: 10px 0; width: auto; min-width: 60%; }
   .tabla.mediciones th { text-transform: none; letter-spacing: 0; font-size: 0.82em; }
@@ -266,8 +275,8 @@
   /* Insignias */
   .badge {
     display: inline-block;
-    background: #edf1f7;
-    color: #46587a;
+    background: var(--primario-tinte);
+    color: var(--texto-suave);
     border-radius: 999px;
     padding: 2px 11px;
     font-size: 0.76em;
@@ -285,7 +294,7 @@
   .error {
     color: var(--mal);
     background: var(--mal-fondo);
-    border: 1px solid #f5c9cc;
+    border: 1px solid #f1b9bc;
     border-radius: 8px;
     padding: 10px 14px;
     margin: 10px 0;
@@ -312,13 +321,13 @@
     font-size: 0.93em;
   }
   .nota-info::before { content: "ℹ  "; font-weight: 700; }
-  .vacio { color: #8a96aa; padding: 28px 14px; text-align: center; }
+  .vacio { color: var(--texto-suave); padding: 28px 14px; text-align: center; }
   .meta { color: var(--texto-suave); font-size: 0.86em; }
   .espec-hint {
-    color: var(--primario);
+    color: var(--acento);
     font-weight: 600;
     font-size: 0.82em;
-    background: var(--primario-tinte);
+    background: var(--acento-tinte);
     border-radius: 6px;
     padding: 1px 7px;
     white-space: nowrap;
@@ -326,7 +335,15 @@
   input.fuera {
     border-color: var(--mal);
     box-shadow: 0 0 0 3px rgba(185, 28, 28, .12);
-    background: #fff7f7;
+    background: var(--mal-fondo);
+  }
+
+  /* Formato inválido según el pattern del campo (validaciones.js): mismo
+     tratamiento que un valor fuera de especificación. :user-invalid solo
+     aplica después de que el usuario interactuó, no en campos vacíos nuevos. */
+  input:user-invalid, select:user-invalid, textarea:user-invalid {
+    border-color: var(--mal);
+    box-shadow: 0 0 0 3px rgba(185, 28, 28, .12);
   }
   .valor-fuera { color: var(--mal); font-weight: 700; }
 
@@ -382,7 +399,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(160deg, #0e1a30 0%, #1b3158 100%);
+    background: linear-gradient(160deg, #1d252d 0%, #333f48 100%);
   }
   .login-caja {
     background: #fff;
@@ -395,9 +412,9 @@
     box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
   }
   .login-marca { text-align: center; margin-bottom: 4px; }
-  .login-marca .logo { font-size: 1.7em; font-weight: 800; color: var(--primario); letter-spacing: 0.04em; }
+  .login-marca .logo { display: inline-block; height: 40px; width: auto; }
   .login-marca .lema { color: var(--texto-suave); font-size: 0.88em; margin-top: 2px; }
-  .login-caja label { display: flex; flex-direction: column; gap: 5px; font-weight: 600; font-size: 0.88em; color: #374761; }
+  .login-caja label { display: flex; flex-direction: column; gap: 5px; font-weight: 600; font-size: 0.88em; color: var(--texto); }
   .login-caja button { padding: 11px; font-size: 1em; }
   .pantalla-carga { padding: 60px; text-align: center; color: var(--texto-suave); }
 
@@ -533,7 +550,7 @@
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
-    background: #f6f8fc;
+    background: var(--primario-tinte);
     border: 1px solid var(--borde);
     border-radius: 8px;
     padding: 8px 14px;
@@ -555,7 +572,7 @@
 
   /* Zona de carga de fotos dentro de los formularios (acumula varias) */
   .campo-carga { display: flex; flex-direction: column; gap: 5px; }
-  .campo-carga > .etiqueta-carga { font-size: 0.88em; font-weight: 600; color: #374761; }
+  .campo-carga > .etiqueta-carga { font-size: 0.88em; font-weight: 600; color: var(--texto); }
   .zona-carga {
     display: flex;
     flex-direction: column;
@@ -563,16 +580,16 @@
     gap: 3px;
     text-align: center;
     padding: 16px 14px;
-    border: 1.5px dashed #c2cfe0;
+    border: 1.5px dashed var(--borde);
     border-radius: 10px;
-    background: #f8fafd;
+    background: var(--primario-tinte);
     color: var(--texto-suave);
     cursor: pointer;
     font-size: 0.9em;
     transition: border-color .15s, background .15s, color .15s;
   }
-  .zona-carga:hover { border-color: var(--primario); background: var(--primario-tinte); color: var(--primario); }
-  .zona-carga.arrastrando { border-color: var(--primario); background: var(--primario-tinte); color: var(--primario); }
+  .zona-carga:hover { border-color: var(--acento); background: var(--acento-tinte); color: var(--acento); }
+  .zona-carga.arrastrando { border-color: var(--acento); background: var(--acento-tinte); color: var(--acento); }
   .zona-carga svg { opacity: .7; margin-bottom: 1px; }
   .zona-carga .hint { font-size: 0.82em; opacity: .85; }
   .miniatura-prev .quitar {
@@ -597,7 +614,7 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(8, 14, 26, .82);
+    background: rgba(29, 37, 45, .82);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -630,7 +647,7 @@
     position: fixed;
     inset: 0;
     z-index: 90;
-    background: rgba(8, 14, 26, .5);
+    background: rgba(29, 37, 45, .5);
     display: flex;
     align-items: center;
     justify-content: center;
