@@ -92,9 +92,9 @@ function Layout({ children }) {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="marca">
-          <img className="logo" src="/logo.png" alt="ALUDEC" />
-          <div className="sub">Laboratorio</div>
+        <div className="marca" style={{ backgroundColor: 'white' }}>
+          <img className="logo" src="/logo.png" alt="ALUDEC" style={{ height: '40px' }}/>
+          <div className="sub" style={{ fontSize: '15px', marginTop: '10px' }}>Laboratorio ALUDEC</div>
         </div>
         <nav>
           <NavLink to="/solicitudes"><IconoSolicitud /> Solicitud de ensayos</NavLink>
