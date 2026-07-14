@@ -11,7 +11,7 @@ router.get('/', requireAuth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireRol('solicitante'), async (req, res, next) => {
+router.post('/', requireRol('solicitante', 'admin_area'), async (req, res, next) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
@@ -23,7 +23,7 @@ router.post('/', requireRol('solicitante'), async (req, res, next) => {
   }
 });
 
-router.put('/:id(\\d+)', requireRol(), async (req, res, next) => {
+router.put('/:id(\\d+)', requireRol('admin_area'), async (req, res, next) => {
   try {
     const nombre = (req.body.nombre || '').trim();
     if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });

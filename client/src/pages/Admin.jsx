@@ -603,7 +603,9 @@ function Clientes({ soloLectura }) {
 export default function Admin() {
   const { user } = useAuth();
   const [tab, setTab] = useState('usuarios');
-  const soloLectura = user.rol !== 'admin';
+  // Acceso total (no solo lectura): admin global y admin de área, de
+  // Químico o de Metrología por igual — no se limita a la suya.
+  const soloLectura = !['admin', 'admin_area'].includes(user.rol);
 
   return (
     <div>

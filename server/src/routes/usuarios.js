@@ -14,7 +14,7 @@ function validarRolArea(rol, areaId) {
   return null;
 }
 
-router.get('/', requireRol('auditor_admin'), async (req, res, next) => {
+router.get('/', requireRol('auditor_admin', 'admin_area'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT u.id, u.usuario, u.nombre, u.rol, u.area_id, u.activo, a.nombre AS area_nombre
@@ -24,7 +24,7 @@ router.get('/', requireRol('auditor_admin'), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requireRol(), async (req, res, next) => {
+router.post('/', requireRol('admin_area'), async (req, res, next) => {
   try {
     const { usuario, nombre, password, rol } = req.body;
     const areaId = req.body.area_id || null;
@@ -44,7 +44,7 @@ router.post('/', requireRol(), async (req, res, next) => {
   }
 });
 
-router.put('/:id', requireRol(), async (req, res, next) => {
+router.put('/:id', requireRol('admin_area'), async (req, res, next) => {
   try {
     const { nombre, rol, activo, password } = req.body;
     const areaId = req.body.area_id !== undefined ? req.body.area_id : undefined;
