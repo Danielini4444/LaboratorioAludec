@@ -23,4 +23,17 @@ router.post('/', requireRol('solicitante'), async (req, res, next) => {
   }
 });
 
+router.put('/:id(\\d+)', requireRol(), async (req, res, next) => {
+  try {
+    const nombre = (req.body.nombre || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'Nombre requerido' });
+    const { rows } = await query('UPDATE clientes SET nombre = $1 WHERE id = $2 RETURNING *', [nombre, req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.json(rows[0]);
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Ya existe un cliente con ese nombre' });
+    next(e);
+  }
+});
+
 module.exports = router;

@@ -34,7 +34,8 @@ function fechaHora(d) {
   });
 }
 
-module.exports = function generarReportePdf(stream, reporte) {
+// opciones.qr: PNG del QR de verificación cuando el reporte está firmado.
+module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
   const doc = new PDFDocument({ size: 'LETTER', margins: { top: MARGEN, bottom: 55, left: MARGEN, right: MARGEN }, bufferPages: true });
   doc.pipe(stream);
 
@@ -223,8 +224,32 @@ module.exports = function generarReportePdf(stream, reporte) {
     doc.font('Helvetica').fontSize(9).text(reporte.valoracion_final, MARGEN, doc.y, { width: ANCHO_UTIL });
     doc.y += 4;
   }
-  // Sin bloque de firmas: el documento no sale "firmado". El responsable de
-  // cada prueba queda en la tabla RESPONSABLE de cada ensayo.
+  // ===== 8. Firma digital =====
+  // Solo cuando el reporte fue firmado (admin / admin de área): nombre del
+  // firmante, momento de la firma y QR a la página pública de verificación.
+  if (reporte.firmado_por) {
+    salto(110);
+    doc.y += 6;
+    const yF = doc.y;
+    doc.rect(MARGEN, yF, ANCHO_UTIL, 92).strokeColor(BORDE).stroke();
+    if (opciones.qr) {
+      try { doc.image(opciones.qr, MARGEN + 8, yF + 8, { fit: [76, 76] }); } catch { /* sin QR: solo texto */ }
+    }
+    const tx = MARGEN + 96;
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('black')
+      .text('FIRMA DIGITAL / DIGITAL SIGNATURE', tx, yF + 10);
+    doc.font('Helvetica-Bold').fontSize(10)
+      .text(reporte.firmado_por_nombre || '', tx, yF + 25);
+    doc.font('Helvetica').fontSize(8).fillColor(GRIS)
+      .text(`Firmado digitalmente el / Digitally signed on: ${fechaHora(reporte.firmado_en)}`, tx, yF + 41)
+      .text(`ID de firma / Signature ID: ${String(reporte.firma_token || '').slice(0, 16).toUpperCase()}`, tx, yF + 53)
+      .text('Verifique la autenticidad escaneando el código QR / Verify authenticity by scanning the QR code',
+        tx, yF + 68, { width: ANCHO_UTIL - 104 });
+    doc.fillColor('black');
+    doc.y = yF + 100;
+  }
+  // Sin firma digital no hay bloque de firmas: el responsable de cada prueba
+  // queda en la tabla RESPONSABLE de cada ensayo.
 
   // ===== Pie de página =====
   const total = doc.bufferedPageRange().count;

@@ -94,11 +94,28 @@ export default function RegistroDetalle() {
   const fotosMuestra = registro.imagenes.filter(img => !img.pieza_id);
   const puedeAprobar = !registro.aprobado_por && !registro.anulado_por &&
     (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Químico'));
+  // Firma digital: SOLO admin, admin de Químico y admin de Metrología,
+  // sobre registros ya aprobados y no anulados.
+  const puedeFirmar = registro.aprobado_por && !registro.anulado_por && !registro.firmado_por &&
+    (user.rol === 'admin' || user.rol === 'admin_area');
 
   const aprobar = async () => {
     try {
       await api(`/registros/${id}/aprobar`, { method: 'PUT' });
       avisar('Registro aprobado', 'ok');
+      cargar();
+    } catch (e) { avisar(e.message); }
+  };
+
+  const firmar = async () => {
+    if (!await confirmar({
+      titulo: `Firmar reporte No. ${registro.reporte_no}`,
+      mensaje: `Vas a firmar digitalmente como ${user.nombre}. La firma queda registrada con fecha y hora, y el PDF saldrá con un QR de verificación.`,
+      textoConfirmar: 'Firmar'
+    })) return;
+    try {
+      await api(`/registros/${id}/firmar`, { method: 'PUT' });
+      avisar('Registro firmado', 'ok');
       cargar();
     } catch (e) { avisar(e.message); }
   };
@@ -111,6 +128,20 @@ export default function RegistroDetalle() {
       setMotivo('');
       avisar('Registro anulado', 'ok');
       cargar();
+    } catch (e) { avisar(e.message); }
+  };
+
+  // Borrado definitivo: solo admin, aplica aunque esté aprobado o firmado.
+  const borrar = async () => {
+    if (!await confirmar({
+      titulo: `Borrar reporte No. ${registro.reporte_no}`,
+      mensaje: 'El registro se borra DEFINITIVAMENTE con sus piezas, mediciones y fotos, sin dejar traza (a diferencia de Anular). Aplica aunque esté aprobado o firmado. Esta acción no se puede deshacer.',
+      textoConfirmar: 'Borrar definitivamente',
+      peligro: true
+    })) return;
+    try {
+      await api(`/registros/${id}`, { method: 'DELETE' });
+      navigate('/registros');
     } catch (e) { avisar(e.message); }
   };
 
@@ -127,6 +158,7 @@ export default function RegistroDetalle() {
               <span className={`badge ${registro.resultado === 'PASS' ? 'ok' : 'mal'}`}>{registro.resultado}</span>
             )}
             {registro.aprobado_por && <span className="badge ok">Aprobado</span>}
+            {registro.firmado_por && <span className="badge ok">Firmado</span>}
             {registro.anulado_por && <span className="badge mal">ANULADO</span>}
           </h2>
           <div className="subtitulo">
@@ -140,11 +172,23 @@ export default function RegistroDetalle() {
             <Link className="boton secundario" to={`/registros/${registro.id}/editar`}>Editar</Link>
           )}
           {puedeAprobar && <button onClick={aprobar}>Aprobar</button>}
+          {puedeFirmar && <button onClick={firmar}>Firmar</button>}
           {user.rol === 'admin' && !registro.anulado_por && (
             <button className="secundario peligro" onClick={() => setAnulando(true)}>Anular</button>
           )}
+          {user.rol === 'admin' && (
+            <button className="secundario peligro" onClick={borrar}>Borrar</button>
+          )}
         </div>
       </div>
+
+      {registro.firmado_por && (
+        <div className="meta">
+          Firmado digitalmente por <strong>{registro.firmado_por_nombre}</strong>
+          {registro.firmado_en && ` el ${new Date(registro.firmado_en).toLocaleString('es-MX')}`}
+          {' '}· el PDF incluye el QR de verificación.
+        </div>
+      )}
 
       {registro.anulado_por && (
         <div className="error">

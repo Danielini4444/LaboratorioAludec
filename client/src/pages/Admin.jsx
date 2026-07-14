@@ -11,6 +11,8 @@ function Usuarios({ soloLectura }) {
   const [areas, setAreas] = useState([]);
   const [form, setForm] = useState({ usuario: '', nombre: '', password: '', rol: 'usuario_area', area_id: '' });
   const [error, setError] = useState('');
+  const [editando, setEditando] = useState(null); // id del usuario en edición
+  const [formEdicion, setFormEdicion] = useState({ nombre: '', rol: '', area_id: '' });
 
   const cargar = () => api('/usuarios').then(setUsuarios).catch(() => {});
   useEffect(() => {
@@ -37,6 +39,27 @@ function Usuarios({ soloLectura }) {
   const alternarActivo = async (u) => {
     try {
       await api(`/usuarios/${u.id}`, { method: 'PUT', body: { activo: !u.activo } });
+      cargar();
+    } catch (e) { alert(e.message); }
+  };
+
+  const empezarEdicion = (u) => {
+    setEditando(u.id);
+    setFormEdicion({ nombre: u.nombre, rol: u.rol, area_id: u.area_id ? String(u.area_id) : '' });
+  };
+
+  const setEd = (campo) => (e) => setFormEdicion({ ...formEdicion, [campo]: e.target.value });
+
+  const guardarEdicion = async (u) => {
+    const esArea = ROLES_DE_AREA.includes(formEdicion.rol);
+    if (!cumple('nombrePersona', formEdicion.nombre.trim())) return alert('Nombre: de 3 a 60 caracteres, solo letras, espacios y guiones');
+    if (esArea && !formEdicion.area_id) return alert('Los roles de área requieren un área asignada');
+    try {
+      await api(`/usuarios/${u.id}`, {
+        method: 'PUT',
+        body: { nombre: formEdicion.nombre.trim(), rol: formEdicion.rol, area_id: esArea ? Number(formEdicion.area_id) : null }
+      });
+      setEditando(null);
       cargar();
     } catch (e) { alert(e.message); }
   };
@@ -82,21 +105,47 @@ function Usuarios({ soloLectura }) {
         <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Área</th><th>Estado</th>{!soloLectura && <th></th>}</tr></thead>
         <tbody>
           {usuarios.map(u => (
-            <tr key={u.id} className={u.activo ? '' : 'inactivo'}>
-              <td>{u.usuario}</td>
-              <td>{u.nombre}</td>
-              <td>{ROLES_NOMBRE[u.rol]}</td>
-              <td>{u.area_nombre || '—'}</td>
-              <td>{u.activo ? 'Activo' : 'Inactivo'}</td>
-              {!soloLectura && (
-                <td className="acciones">
-                  <button className="chico secundario" onClick={() => alternarActivo(u)}>
-                    {u.activo ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button className="chico secundario" onClick={() => resetPassword(u)}>Contraseña</button>
+            editando === u.id ? (
+              <tr key={u.id}>
+                <td>{u.usuario}</td>
+                <td><input value={formEdicion.nombre} onChange={setEd('nombre')} /></td>
+                <td>
+                  <select value={formEdicion.rol} onChange={setEd('rol')}>
+                    {Object.entries(ROLES_NOMBRE).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                  </select>
                 </td>
-              )}
-            </tr>
+                <td>
+                  {ROLES_DE_AREA.includes(formEdicion.rol) ? (
+                    <select value={formEdicion.area_id} onChange={setEd('area_id')}>
+                      <option value="">— elegir —</option>
+                      {areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                    </select>
+                  ) : '—'}
+                </td>
+                <td>{u.activo ? 'Activo' : 'Inactivo'}</td>
+                <td className="acciones">
+                  <button className="chico" onClick={() => guardarEdicion(u)}>Guardar</button>
+                  <button className="chico secundario" onClick={() => setEditando(null)}>Cancelar</button>
+                </td>
+              </tr>
+            ) : (
+              <tr key={u.id} className={u.activo ? '' : 'inactivo'}>
+                <td>{u.usuario}</td>
+                <td>{u.nombre}</td>
+                <td>{ROLES_NOMBRE[u.rol]}</td>
+                <td>{u.area_nombre || '—'}</td>
+                <td>{u.activo ? 'Activo' : 'Inactivo'}</td>
+                {!soloLectura && (
+                  <td className="acciones">
+                    <button className="chico" onClick={() => empezarEdicion(u)}>Editar</button>
+                    <button className="chico secundario" onClick={() => alternarActivo(u)}>
+                      {u.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <button className="chico secundario" onClick={() => resetPassword(u)}>Contraseña</button>
+                  </td>
+                )}
+              </tr>
+            )
           ))}
         </tbody>
       </table>
@@ -111,6 +160,8 @@ function Piezas({ soloLectura }) {
   const [filtroCliente, setFiltroCliente] = useState('');
   const [form, setForm] = useState({ referencia: '', denominacion: '', cliente_id: '' });
   const [error, setError] = useState('');
+  const [editando, setEditando] = useState(null); // id de la pieza en edición
+  const [formEdicion, setFormEdicion] = useState({ referencia: '', denominacion: '', cliente_id: '' });
 
   const cargar = (q = busqueda, cid = filtroCliente) =>
     api(`/piezas?q=${encodeURIComponent(q)}&cliente_id=${cid}`).then(setPiezas).catch(() => {});
@@ -131,9 +182,26 @@ function Piezas({ soloLectura }) {
     } catch (e) { setError(e.message); }
   };
 
-  const cambiarCliente = async (pieza, clienteId) => {
+  const empezarEdicion = (p) => {
+    setEditando(p.id);
+    setFormEdicion({ referencia: p.referencia, denominacion: p.denominacion, cliente_id: String(p.cliente_id) });
+  };
+
+  const setEd = (campo) => (e) => setFormEdicion({ ...formEdicion, [campo]: e.target.value });
+
+  const guardarEdicion = async (p) => {
+    if (!cumple('referencia', formEdicion.referencia.trim())) return alert('Referencia: de 2 a 30 caracteres — letras, números, espacios, puntos o guiones');
+    if (!cumple('denominacion', formEdicion.denominacion.trim())) return alert('Denominación: de 2 a 80 caracteres');
     try {
-      await api(`/piezas/${pieza.id}`, { method: 'PUT', body: { cliente_id: Number(clienteId) } });
+      await api(`/piezas/${p.id}`, {
+        method: 'PUT',
+        body: {
+          referencia: formEdicion.referencia.trim(),
+          denominacion: formEdicion.denominacion.trim(),
+          cliente_id: Number(formEdicion.cliente_id)
+        }
+      });
+      setEditando(null);
       cargar();
     } catch (e) { alert(e.message); }
   };
@@ -180,25 +248,37 @@ function Piezas({ soloLectura }) {
         <thead><tr><th>Referencia</th><th>Denominación</th><th>Cliente</th><th>Estado</th>{!soloLectura && <th></th>}</tr></thead>
         <tbody>
           {piezas.map(p => (
-            <tr key={p.id} className={p.activa ? '' : 'inactivo'}>
-              <td>{p.referencia}</td>
-              <td>{p.denominacion}</td>
-              <td>
-                {soloLectura ? p.cliente_nombre : (
-                  <select value={p.cliente_id} onChange={e => cambiarCliente(p, e.target.value)}>
+            editando === p.id ? (
+              <tr key={p.id}>
+                <td><input value={formEdicion.referencia} onChange={setEd('referencia')} /></td>
+                <td><input value={formEdicion.denominacion} onChange={setEd('denominacion')} /></td>
+                <td>
+                  <select value={formEdicion.cliente_id} onChange={setEd('cliente_id')}>
                     {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
-                )}
-              </td>
-              <td>{p.activa ? 'Activa' : 'Inactiva'}</td>
-              {!soloLectura && (
-                <td>
-                  <button className="chico secundario" onClick={() => alternarActiva(p)}>
-                    {p.activa ? 'Desactivar' : 'Activar'}
-                  </button>
                 </td>
-              )}
-            </tr>
+                <td>{p.activa ? 'Activa' : 'Inactiva'}</td>
+                <td className="acciones">
+                  <button className="chico" onClick={() => guardarEdicion(p)}>Guardar</button>
+                  <button className="chico secundario" onClick={() => setEditando(null)}>Cancelar</button>
+                </td>
+              </tr>
+            ) : (
+              <tr key={p.id} className={p.activa ? '' : 'inactivo'}>
+                <td>{p.referencia}</td>
+                <td>{p.denominacion}</td>
+                <td>{p.cliente_nombre}</td>
+                <td>{p.activa ? 'Activa' : 'Inactiva'}</td>
+                {!soloLectura && (
+                  <td className="acciones">
+                    <button className="chico" onClick={() => empezarEdicion(p)}>Editar</button>
+                    <button className="chico secundario" onClick={() => alternarActiva(p)}>
+                      {p.activa ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </td>
+                )}
+              </tr>
+            )
           ))}
           {!piezas.length && <tr><td colSpan="5" className="vacio">Sin piezas</td></tr>}
         </tbody>
@@ -211,6 +291,8 @@ function Equipos({ soloLectura }) {
   const [equipos, setEquipos] = useState([]);
   const [form, setForm] = useState({ nombre: '', referencia_interna: '', fecha_calibracion: '' });
   const [error, setError] = useState('');
+  const [editando, setEditando] = useState(null); // id del equipo en edición
+  const [formEdicion, setFormEdicion] = useState({ nombre: '', referencia_interna: '', fecha_calibracion: '' });
 
   const cargar = () => api('/equipos').then(setEquipos).catch(() => {});
   useEffect(() => { cargar(); }, []);
@@ -237,6 +319,35 @@ function Equipos({ soloLectura }) {
     } catch (e) { alert(e.message); }
   };
 
+  const empezarEdicion = (q) => {
+    setEditando(q.id);
+    setFormEdicion({
+      nombre: q.nombre,
+      referencia_interna: q.referencia_interna || '',
+      fecha_calibracion: q.fecha_calibracion ? q.fecha_calibracion.slice(0, 10) : ''
+    });
+  };
+
+  const setEd = (campo) => (e) => setFormEdicion({ ...formEdicion, [campo]: e.target.value });
+
+  const guardarEdicion = async (q) => {
+    if (!cumple('nombreCatalogo', formEdicion.nombre.trim())) return alert('Nombre: de 2 a 60 caracteres');
+    const refInterna = formEdicion.referencia_interna.trim();
+    if (refInterna && !cumple('equipoId', refInterna)) return alert('ID interno: código alfanumérico con guiones, sin espacios (ej. LM-INS-001)');
+    try {
+      await api(`/equipos/${q.id}`, {
+        method: 'PUT',
+        body: {
+          nombre: formEdicion.nombre.trim(),
+          referencia_interna: refInterna || null,
+          fecha_calibracion: formEdicion.fecha_calibracion || null
+        }
+      });
+      setEditando(null);
+      cargar();
+    } catch (e) { alert(e.message); }
+  };
+
   return (
     <div>
       {!soloLectura && (
@@ -255,27 +366,33 @@ function Equipos({ soloLectura }) {
         <thead><tr><th>Equipo</th><th>ID interno</th><th>Última calibración</th><th>Estado</th>{!soloLectura && <th></th>}</tr></thead>
         <tbody>
           {equipos.map(q => (
-            <tr key={q.id} className={q.activo ? '' : 'inactivo'}>
-              <td>{q.nombre}</td>
-              <td>{q.referencia_interna || '—'}</td>
-              <td>
-                {soloLectura ? (q.fecha_calibracion ? new Date(q.fecha_calibracion).toLocaleDateString('es-MX') : '—') : (
-                  <input
-                    type="date"
-                    defaultValue={q.fecha_calibracion ? q.fecha_calibracion.slice(0, 10) : ''}
-                    onBlur={e => { if (e.target.value && e.target.value !== (q.fecha_calibracion || '').slice(0, 10)) actualizar(q.id, { fecha_calibracion: e.target.value }); }}
-                  />
-                )}
-              </td>
-              <td>{q.activo ? 'Activo' : 'Inactivo'}</td>
-              {!soloLectura && (
-                <td>
-                  <button className="chico secundario" onClick={() => actualizar(q.id, { activo: !q.activo })}>
-                    {q.activo ? 'Desactivar' : 'Activar'}
-                  </button>
+            editando === q.id ? (
+              <tr key={q.id}>
+                <td><input value={formEdicion.nombre} onChange={setEd('nombre')} /></td>
+                <td><input value={formEdicion.referencia_interna} onChange={setEd('referencia_interna')} placeholder="LM-INS-001" /></td>
+                <td><input type="date" value={formEdicion.fecha_calibracion} onChange={setEd('fecha_calibracion')} /></td>
+                <td>{q.activo ? 'Activo' : 'Inactivo'}</td>
+                <td className="acciones">
+                  <button className="chico" onClick={() => guardarEdicion(q)}>Guardar</button>
+                  <button className="chico secundario" onClick={() => setEditando(null)}>Cancelar</button>
                 </td>
-              )}
-            </tr>
+              </tr>
+            ) : (
+              <tr key={q.id} className={q.activo ? '' : 'inactivo'}>
+                <td>{q.nombre}</td>
+                <td>{q.referencia_interna || '—'}</td>
+                <td>{q.fecha_calibracion ? new Date(q.fecha_calibracion).toLocaleDateString('es-MX') : '—'}</td>
+                <td>{q.activo ? 'Activo' : 'Inactivo'}</td>
+                {!soloLectura && (
+                  <td className="acciones">
+                    <button className="chico" onClick={() => empezarEdicion(q)}>Editar</button>
+                    <button className="chico secundario" onClick={() => actualizar(q.id, { activo: !q.activo })}>
+                      {q.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </td>
+                )}
+              </tr>
+            )
           ))}
           {!equipos.length && <tr><td colSpan="5" className="vacio">Sin equipos</td></tr>}
         </tbody>
@@ -412,29 +529,40 @@ function Normas({ soloLectura }) {
   );
 }
 
-function ListaSimple({ recurso, titulo, soloLectura }) {
-  const [items, setItems] = useState([]);
+function Clientes({ soloLectura }) {
+  const [clientes, setClientes] = useState([]);
   const [nombre, setNombre] = useState('');
   const [error, setError] = useState('');
+  const [editando, setEditando] = useState(null); // id del cliente en edición
+  const [nombreEdicion, setNombreEdicion] = useState('');
 
-  const cargar = () => api(`/${recurso}`).then(setItems).catch(() => {});
-  useEffect(() => { cargar(); }, [recurso]);
+  const cargar = () => api('/clientes').then(setClientes).catch(() => {});
+  useEffect(() => { cargar(); }, []);
 
   const crear = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await api(`/${recurso}`, { method: 'POST', body: { nombre } });
+      await api('/clientes', { method: 'POST', body: { nombre } });
       setNombre('');
       cargar();
     } catch (e) { setError(e.message); }
+  };
+
+  const guardarEdicion = async (c) => {
+    if (!cumple('nombreCatalogo', nombreEdicion.trim())) return alert('Nombre: de 2 a 60 caracteres');
+    try {
+      await api(`/clientes/${c.id}`, { method: 'PUT', body: { nombre: nombreEdicion.trim() } });
+      setEditando(null);
+      cargar();
+    } catch (e) { alert(e.message); }
   };
 
   return (
     <div>
       {!soloLectura && (
         <form className="tarjeta formulario" onSubmit={crear}>
-          <h3>{titulo}</h3>
+          <h3>Nuevo cliente</h3>
           <div className="fila">
             <label>Nombre<input value={nombre} onChange={e => setNombre(e.target.value)} required {...val('nombreCatalogo')} /></label>
           </div>
@@ -443,10 +571,29 @@ function ListaSimple({ recurso, titulo, soloLectura }) {
         </form>
       )}
       <table className="tabla">
-        <thead><tr><th>Nombre</th></tr></thead>
+        <thead><tr><th>Nombre</th>{!soloLectura && <th></th>}</tr></thead>
         <tbody>
-          {items.map(i => <tr key={i.id}><td>{i.nombre}{i.activa === false ? ' (inactiva)' : ''}</td></tr>)}
-          {!items.length && <tr><td className="vacio">Vacío</td></tr>}
+          {clientes.map(c => (
+            editando === c.id ? (
+              <tr key={c.id}>
+                <td><input value={nombreEdicion} onChange={e => setNombreEdicion(e.target.value)} /></td>
+                <td className="acciones">
+                  <button className="chico" onClick={() => guardarEdicion(c)}>Guardar</button>
+                  <button className="chico secundario" onClick={() => setEditando(null)}>Cancelar</button>
+                </td>
+              </tr>
+            ) : (
+              <tr key={c.id}>
+                <td>{c.nombre}</td>
+                {!soloLectura && (
+                  <td className="acciones">
+                    <button className="chico" onClick={() => { setEditando(c.id); setNombreEdicion(c.nombre); }}>Editar</button>
+                  </td>
+                )}
+              </tr>
+            )
+          ))}
+          {!clientes.length && <tr><td className="vacio">Vacío</td></tr>}
         </tbody>
       </table>
     </div>
@@ -475,7 +622,7 @@ export default function Admin() {
       {tab === 'piezas' && <Piezas soloLectura={soloLectura} />}
       {tab === 'normas' && <Normas soloLectura={soloLectura} />}
       {tab === 'equipos' && <Equipos soloLectura={soloLectura} />}
-      {tab === 'clientes' && <ListaSimple recurso="clientes" titulo="Nuevo cliente" soloLectura={soloLectura} />}
+      {tab === 'clientes' && <Clientes soloLectura={soloLectura} />}
     </div>
   );
 }

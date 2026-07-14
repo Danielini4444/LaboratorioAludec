@@ -32,14 +32,20 @@ router.post('/', requireRol('admin_area'), async (req, res, next) => {
 router.put('/:id(\\d+)', requireRol('admin_area'), async (req, res, next) => {
   try {
     const { nombre, referencia_interna, fecha_calibracion, activo } = req.body;
+    // referencia_interna y fecha_calibracion admiten null explícito para vaciarlas
     const { rows } = await query(
       `UPDATE equipos SET
          nombre = COALESCE($1, nombre),
-         referencia_interna = COALESCE($2, referencia_interna),
-         fecha_calibracion = COALESCE($3, fecha_calibracion),
-         activo = COALESCE($4, activo)
-       WHERE id = $5 RETURNING *`,
-      [nombre, referencia_interna, fecha_calibracion, activo, req.params.id]
+         referencia_interna = CASE WHEN $2::boolean THEN $3 ELSE referencia_interna END,
+         fecha_calibracion = CASE WHEN $4::boolean THEN $5::date ELSE fecha_calibracion END,
+         activo = COALESCE($6, activo)
+       WHERE id = $7 RETURNING *`,
+      [
+        nombre,
+        referencia_interna !== undefined, referencia_interna || null,
+        fecha_calibracion !== undefined, fecha_calibracion || null,
+        activo, req.params.id
+      ]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Equipo no encontrado' });
     res.json(rows[0]);

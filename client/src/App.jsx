@@ -94,7 +94,9 @@ function Layout({ children }) {
       <aside className="sidebar">
         <div className="marca" style={{ backgroundColor: 'white' }}>
           <img className="logo" src="/logo.png" alt="ALUDEC" style={{ height: '40px' }}/>
-          <div className="sub" style={{ fontSize: '15px', marginTop: '10px' }}>Laboratorio ALUDEC</div>
+          <div className="sub" style={{ fontSize: '15px', marginTop: '10px', color: 'black' }}>
+          <span><b>Laboratorio ALUDEC</b></span>
+          </div>
         </div>
         <nav>
           <NavLink to="/solicitudes"><IconoSolicitud /> Solicitud de ensayos</NavLink>

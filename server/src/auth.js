@@ -38,4 +38,19 @@ function requireArea(area, soloAdmin = false) {
 const esQuimico = (user, soloAdmin) => esDeArea(user, 'Químico', soloAdmin);
 const requireQuimico = (soloAdmin) => requireArea('Químico', soloAdmin);
 
-module.exports = { requireAuth, requireRol, esDeArea, requireArea, esQuimico, requireQuimico };
+// Firmantes de documentos: SOLO admin global, admin de Químico y admin de
+// Metrología (admin_area siempre tiene una de esas dos áreas).
+function puedeFirmar(user) {
+  return user.rol === 'admin' || user.rol === 'admin_area';
+}
+
+function requireFirmante(req, res, next) {
+  const u = req.session.user;
+  if (!u) return res.status(401).json({ error: 'No autenticado' });
+  if (!puedeFirmar(u)) {
+    return res.status(403).json({ error: 'Solo admin, admin de Químico o admin de Metrología pueden firmar' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireRol, esDeArea, requireArea, esQuimico, requireQuimico, puedeFirmar, requireFirmante };

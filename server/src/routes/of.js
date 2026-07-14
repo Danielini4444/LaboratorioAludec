@@ -10,6 +10,7 @@ const { query } = require('../db');
 const { requireAuth } = require('../auth');
 const { cargarRegistro } = require('./registros');
 const { cargarReporte } = require('./reportes');
+const { qrDeFirma } = require('../firma');
 const generarRegistroPdf = require('../pdf/registroPdf');
 const generarReportePdf = require('../pdf/reportePdf');
 
@@ -116,7 +117,8 @@ router.get('/pdf', requireAuth, async (req, res, next) => {
       if (!reporte || (reporte.of || '').trim() !== of) continue;
       const seleccion = ids(req.query[`pruebas_${id}`]);
       if (seleccion.length) reporte.pruebas = reporte.pruebas.filter(p => seleccion.includes(p.id));
-      buffers.push(await aBuffer(generarReportePdf, reporte));
+      const qr = await qrDeFirma(req, 'reporte', reporte);
+      buffers.push(await aBuffer((s, datos) => generarReportePdf(s, datos, { qr }), reporte));
     }
     for (const id of idsRegistros) {
       const registro = await cargarRegistro(id);
@@ -126,6 +128,7 @@ router.get('/pdf', requireAuth, async (req, res, next) => {
       const opciones = pedidas.length
         ? { secciones: Object.fromEntries(SECCIONES_REGISTRO.map(s => [s, pedidas.includes(s)])) }
         : {};
+      opciones.qr = await qrDeFirma(req, 'registro', registro);
       buffers.push(await aBuffer((s, datos) => generarRegistroPdf(s, datos, opciones), registro));
     }
     if (!buffers.length) {
