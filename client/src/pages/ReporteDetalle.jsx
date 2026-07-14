@@ -32,6 +32,14 @@ function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
   const [archivos, setArchivos] = useState([]);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
+  const formRef = useRef(null);
+
+  // El formulario se monta arriba de la lista de pruebas; al abrirlo desde un
+  // botón "Completar" que puede estar bien abajo, se lleva la vista hacia él
+  // (si no, parece que "no se despliega" porque queda fuera de pantalla).
+  useEffect(() => {
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
 
@@ -63,7 +71,7 @@ function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
   };
 
   return (
-    <form className="tarjeta formulario" onSubmit={enviar}>
+    <form ref={formRef} className="tarjeta formulario" onSubmit={enviar}>
       <h3>{prueba ? `Completar prueba ${prueba.numero}: ${prueba.ensayo}` : 'Agregar prueba'}</h3>
 
       <h4 className="sub-seccion primera">Identificación de la prueba</h4>
@@ -420,16 +428,6 @@ export default function ReporteDetalle() {
         />
       )}
 
-      {editando && (
-        <FormPrueba
-          reporte={reporte}
-          equipos={equipos}
-          prueba={editando}
-          onGuardada={() => { setEditando(null); cargar(); }}
-          onCancelar={() => setEditando(null)}
-        />
-      )}
-
       {aprobando && (
         <FormAprobar
           reporte={reporte}
@@ -447,6 +445,16 @@ export default function ReporteDetalle() {
       )}
       {!reporte.pruebas.length && <div className="vacio">Todavía no hay pruebas. Se agregan conforme se van terminando.</div>}
       {reporte.pruebas.map(p => (
+        editando && editando.id === p.id ? (
+          <FormPrueba
+            key={p.id}
+            reporte={reporte}
+            equipos={equipos}
+            prueba={editando}
+            onGuardada={() => { setEditando(null); cargar(); }}
+            onCancelar={() => setEditando(null)}
+          />
+        ) : (
         <div className="tarjeta" key={p.id}>
           <div className="ensayo-titulo">
             <strong>
@@ -472,6 +480,7 @@ export default function ReporteDetalle() {
           {p.tipo_falla && <div><span className="meta">Tipo de falla:</span> {p.tipo_falla}</div>}
           <FotosPrueba prueba={p} puedeEditar={captura} onCambio={cargar} onAbrir={setFoto} confirmar={confirmar} avisar={avisar} />
         </div>
+        )
       ))}
       <Link to="/reportes">← Volver a reportes</Link>
 
