@@ -100,16 +100,36 @@ Endurecimiento pensado para que los registros aguanten una auditoría IATF:
 
 ## Arrancar
 
+Para desarrollo con recarga automática: `npm run dev` (servidor en :3000, cliente en :5173).
+
+## Despliegue en un servidor nuevo
+
 ```
-npm run migrate   # aplica migraciones pendientes (solo tras cambios de esquema)
-npm run seed      # datos iniciales (solo la primera vez; no hace nada si ya hay datos)
+git clone <url-del-repo>
+cd lab
+npm install                       # dependencias del proyecto raíz
+npm --prefix server install
+npm --prefix client install
+
+cp server/.env.example server/.env
+# editar server/.env: DATABASE_URL, SESSION_SECRET propio y APP_URL (ver abajo)
+
+# la base de datos de DATABASE_URL debe existir antes de migrar (migrate.js
+# crea las tablas, no la base): createdb lab   -- o el nombre que hayas puesto
+
+npm run migrate   # crea el esquema
+npm run seed      # usuarios y áreas iniciales (SOLO la primera vez, en base vacía)
 npm run build     # compila el cliente
 npm start         # un solo proceso en http://localhost:3000 (sirve API + interfaz)
 ```
 
-Para desarrollo con recarga automática: `npm run dev` (servidor en :3000, cliente en :5173).
+Requiere PostgreSQL corriendo y accesible con la `DATABASE_URL` que pongas en `server/.env`.
 
-Requiere PostgreSQL corriendo; la conexión se configura en `server/.env` (`DATABASE_URL`). Para la intranet, los demás equipos entran con `http://<IP-de-esta-máquina>:3000` (hay que permitir el puerto 3000 en el Firewall de Windows).
+### Para que otros equipos y celulares entren
+
+1. **`APP_URL` en `server/.env`** — la IP fija o nombre del servidor en la intranet (p. ej. `http://192.168.1.50:3000`). Sin esto, el sistema intenta adivinar la IP del servidor, lo que falla si tiene más de una red activa a la vez (ver "Firma digital y QR de verificación" más abajo).
+2. **Firewall del servidor** — el puerto (3000, o 443 si se pone detrás de un reverse proxy) debe estar permitido para el perfil de red real de esa máquina. En Windows, `Get-NetConnectionProfile` dice si la red del servidor es `Domain`, `Private` o `Public`; la regla de firewall tiene que cubrir ese perfil (una regla genérica de Node.js suele venir limitada solo a `Domain`, y no sirve si el servidor no está en esa categoría).
+3. **Probar desde un dispositivo aparte** del servidor (celular, otra máquina) — un `curl` hecho desde el propio servidor no revela si el firewall está bloqueando tráfico externo.
 
 ## Usuarios iniciales
 
