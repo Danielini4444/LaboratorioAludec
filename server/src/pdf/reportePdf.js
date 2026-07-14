@@ -171,6 +171,7 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     if (p.condiciones) filasDetalle.push(['Condiciones de ensayo / Test conditions', p.condiciones]);
     if (p.resultado) filasDetalle.push(['Resultado / Result', p.resultado]);
     if (p.tipo_falla) filasDetalle.push(['Tipo de falla / Failure type', p.tipo_falla]);
+    if (p.comentario) filasDetalle.push(['Comentarios / Comments', p.comentario]);
     if (filasDetalle.length) {
       tabla([{ titulo: '', ancho: 170 }, { titulo: '', ancho: 342 }], filasDetalle, 0.001);
     }

@@ -136,7 +136,7 @@ router.put('/:id(\\d+)', requireArea(AREA), async (req, res, next) => {
 router.post('/:id(\\d+)/pruebas', requireArea(AREA), async (req, res, next) => {
   try {
     const { ensayo, norma, apartado, criterios, equipo_id, condiciones,
-            fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion } = req.body;
+            fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion, comentario } = req.body;
     if (!ensayo) return res.status(400).json({ error: 'El nombre del ensayo es requerido' });
     if (valoracion && !['OK', 'NOK'].includes(valoracion)) {
       return res.status(400).json({ error: 'La valoración debe ser OK o NOK' });
@@ -149,12 +149,12 @@ router.post('/:id(\\d+)/pruebas', requireArea(AREA), async (req, res, next) => {
     const { rows } = await query(
       `INSERT INTO reporte_pruebas
          (reporte_id, numero, ensayo, norma, apartado, criterios, equipo_id, condiciones,
-          fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion, realizado_por)
+          fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion, comentario, realizado_por)
        VALUES ($1, (SELECT coalesce(max(numero), 0) + 1 FROM reporte_pruebas WHERE reporte_id = $1),
-               $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+               $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [req.params.id, ensayo.trim(), norma || null, apartado || null, criterios || null,
        equipo_id || null, condiciones || null, fecha_inicio || null, fecha_fin || null,
-       resultado || null, tipo_falla || null, valoracion || null, req.session.user.id]
+       resultado || null, tipo_falla || null, valoracion || null, comentario || null, req.session.user.id]
     );
     res.status(201).json(rows[0]);
   } catch (e) {
@@ -206,7 +206,7 @@ router.post('/:id(\\d+)/precargar-plan', requireArea(AREA), async (req, res, nex
 router.put('/pruebas/:pruebaId(\\d+)', requireArea(AREA), async (req, res, next) => {
   try {
     const { ensayo, norma, apartado, criterios, equipo_id, condiciones,
-            fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion } = req.body;
+            fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion, comentario } = req.body;
     if (valoracion && !['OK', 'NOK'].includes(valoracion)) {
       return res.status(400).json({ error: 'La valoración debe ser OK o NOK' });
     }
@@ -223,12 +223,13 @@ router.put('/pruebas/:pruebaId(\\d+)', requireArea(AREA), async (req, res, next)
          resultado = COALESCE($9, p.resultado),
          tipo_falla = COALESCE($10, p.tipo_falla),
          valoracion = COALESCE($11, p.valoracion),
-         realizado_por = $12
+         comentario = COALESCE($12, p.comentario),
+         realizado_por = $13
        FROM reportes_ensayo r
-       WHERE p.id = $13 AND r.id = p.reporte_id AND r.aprobado_por IS NULL AND r.anulado_por IS NULL
+       WHERE p.id = $14 AND r.id = p.reporte_id AND r.aprobado_por IS NULL AND r.anulado_por IS NULL
        RETURNING p.*`,
       [ensayo, norma, apartado, criterios, equipo_id, condiciones,
-       fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion,
+       fecha_inicio, fecha_fin, resultado, tipo_falla, valoracion, comentario,
        req.session.user.id, req.params.pruebaId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Prueba no encontrada o el reporte ya está aprobado' });

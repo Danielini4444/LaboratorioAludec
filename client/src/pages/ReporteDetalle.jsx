@@ -12,7 +12,7 @@ import { val } from '../validaciones.js';
 
 const PRUEBA_VACIA = {
   ensayo: '', norma: '', apartado: '', criterios: '', equipo_id: '',
-  condiciones: '', fecha_inicio: '', fecha_fin: '', resultado: '', tipo_falla: '', valoracion: ''
+  condiciones: '', fecha_inicio: '', fecha_fin: '', resultado: '', tipo_falla: '', valoracion: '', comentario: ''
 };
 
 function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
@@ -27,7 +27,8 @@ function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
     fecha_fin: prueba.fecha_fin ? prueba.fecha_fin.slice(0, 16) : '',
     resultado: prueba.resultado || '',
     tipo_falla: prueba.tipo_falla || '',
-    valoracion: prueba.valoracion || ''
+    valoracion: prueba.valoracion || '',
+    comentario: prueba.comentario || ''
   } : { ...PRUEBA_VACIA });
   const [archivos, setArchivos] = useState([]);
   const [error, setError] = useState('');
@@ -128,6 +129,11 @@ function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
         </label>
         <CargaFotos titulo="Evidencia (JPG/PNG)" archivos={archivos} onCambio={setArchivos} />
       </div>
+
+      <h4 className="sub-seccion">Comentarios</h4>
+      <label>Comentarios
+        <textarea rows="3" value={form.comentario} onChange={set('comentario')} placeholder="Observaciones o notas de esta prueba" />
+      </label>
 
       {error && <div className="error">{error}</div>}
       <div className="acciones">
@@ -478,6 +484,7 @@ export default function ReporteDetalle() {
           {p.condiciones && <div><span className="meta">Condiciones:</span> {p.condiciones}</div>}
           {p.resultado && <div><span className="meta">Resultado:</span> {p.resultado}</div>}
           {p.tipo_falla && <div><span className="meta">Tipo de falla:</span> {p.tipo_falla}</div>}
+          {p.comentario && <div><span className="meta">Comentarios:</span> {p.comentario}</div>}
           <FotosPrueba prueba={p} puedeEditar={captura} onCambio={cargar} onAbrir={setFoto} confirmar={confirmar} avisar={avisar} />
         </div>
         )
