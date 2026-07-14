@@ -246,15 +246,17 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
       .text(`Piece ${pieza.numero} — Rack position ${pieza.posicion_rack || '—'} ${pieza.densidad}`, MARGEN, doc.y);
     doc.y += 2;
     tabla(doc, MARGEN + 60, [
-      { titulo: 'measurement\npoint', ancho: 80 },
-      { titulo: `Cr thickness\n(${limiteTexto(espec, 'cr', 'µm')})`, ancho: 120 },
-      { titulo: `TOTAL Nickel\nThickness (${limiteTexto(espec, 'ni_t', 'µm')})`, ancho: 120 },
-      { titulo: `Cu thickness\n(${limiteTexto(espec, 'cu', 'µm')})`, ancho: 120 }
+      { titulo: 'measurement\npoint', ancho: 50 },
+      { titulo: `Cr thickness\n(${limiteTexto(espec, 'cr', 'µm')})`, ancho: 95 },
+      { titulo: `TOTAL Nickel\nThickness (${limiteTexto(espec, 'ni_t', 'µm')})`, ancho: 100 },
+      { titulo: `Cu thickness\n(${limiteTexto(espec, 'cu', 'µm')})`, ancho: 95 },
+      { titulo: 'Comment', ancho: 110 }
     ], pieza.mediciones.map(m => [
       m.punto,
       { texto: m.cr, rojo: fueraDeLimite(espec, 'cr', m.cr) },
       { texto: m.ni_total, rojo: fueraDeLimite(espec, 'ni_t', m.ni_total) },
-      { texto: m.cu, rojo: fueraDeLimite(espec, 'cu', m.cu) }
+      { texto: m.cu, rojo: fueraDeLimite(espec, 'cu', m.cu) },
+      m.comentario || ''
     ]));
   }
 
@@ -264,7 +266,8 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
   // ===== Página 2: S.T.E.P. TEST REPORT (incluye el conteo de poros) =====
   const conStep = registro.piezas.filter(p =>
     p.ni_sb !== null || p.ni_br !== null || p.ni_mps !== null ||
-    p.dp_mp_br !== null || p.dp_br_sb !== null
+    p.dp_mp_br !== null || p.dp_br_sb !== null ||
+    p.ni_sb_pct !== null || p.ni_br_pct !== null
   );
   const conPoros = registro.piezas.filter(p => p.poros !== null);
   const quiereStep = secciones.step && conStep.length > 0;
@@ -279,17 +282,21 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
       doc.y += 2;
       const base = niTotalBase(pieza);
       tabla(doc, MARGEN, [
-        { titulo: 'measurement\npoint', ancho: 62 },
-        { titulo: `Nickel SB\nThickness (${limiteTexto(espec, 'sb_ni', 'µm')})`, ancho: 95 },
-        { titulo: `Br Nickel\nThickness (${limiteTexto(espec, 'br_ni', 'µm')})`, ancho: 95 },
-        { titulo: `MPS Nickel\nThickness (${limiteTexto(espec, 'mp_ni', 'µm')})`, ancho: 90 },
-        { titulo: `Pot. Diff. NiMPS-NiB\n(${limiteTexto(espec, 'step_mp_br', 'mV')})`, ancho: 85 },
-        { titulo: `Pot. Diff. NiB-NiSB\n(${limiteTexto(espec, 'step_br_sb', 'mV')})`, ancho: 85 }
+        { titulo: 'measurement\npoint', ancho: 42 },
+        { titulo: `Nickel SB\nThickness (${limiteTexto(espec, 'sb_ni', 'µm')})`, ancho: 72 },
+        { titulo: `Br Nickel\nThickness (${limiteTexto(espec, 'br_ni', 'µm')})`, ancho: 72 },
+        { titulo: `MPS Nickel\nThickness (${limiteTexto(espec, 'mp_ni', 'µm')})`, ancho: 72 },
+        { titulo: '% Ni SB', ancho: 48 },
+        { titulo: '% Ni Br', ancho: 48 },
+        { titulo: `Pot. Diff. NiMPS-NiB\n(${limiteTexto(espec, 'step_mp_br', 'mV')})`, ancho: 79 },
+        { titulo: `Pot. Diff. NiB-NiSB\n(${limiteTexto(espec, 'step_br_sb', 'mV')})`, ancho: 79 }
       ], [[
         pieza.step_punto,
         { texto: pieza.ni_sb, rojo: fueraDeLimite(espec, 'sb_ni', pieza.ni_sb, base) },
         { texto: pieza.ni_br, rojo: fueraDeLimite(espec, 'br_ni', pieza.ni_br, base) },
         { texto: pieza.ni_mps, rojo: fueraDeLimite(espec, 'mp_ni', pieza.ni_mps, base) },
+        pieza.ni_sb_pct != null ? `${pieza.ni_sb_pct}%` : '—',
+        pieza.ni_br_pct != null ? `${pieza.ni_br_pct}%` : '—',
         { texto: pieza.dp_mp_br, rojo: fueraDeLimite(espec, 'step_mp_br', pieza.dp_mp_br) },
         { texto: pieza.dp_br_sb, rojo: fueraDeLimite(espec, 'step_br_sb', pieza.dp_br_sb) }
       ]]);

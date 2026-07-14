@@ -45,7 +45,7 @@ async function cargarRegistro(id) {
   const [piezas, imagenes, espec] = await Promise.all([
     query(
       `SELECT p.*,
-         (SELECT coalesce(json_agg(json_build_object('punto', m.punto, 'cr', m.cr, 'ni_total', m.ni_total, 'cu', m.cu) ORDER BY m.punto), '[]')
+         (SELECT coalesce(json_agg(json_build_object('punto', m.punto, 'cr', m.cr, 'ni_total', m.ni_total, 'cu', m.cu, 'comentario', m.comentario) ORDER BY m.punto), '[]')
           FROM registro_mediciones m WHERE m.pieza_id = p.id) AS mediciones
        FROM registro_piezas p WHERE p.registro_id = $1 ORDER BY p.numero`, [id]
     ),
@@ -138,20 +138,22 @@ router.post('/', requireQuimico(), async (req, res, next) => {
       const { rows: pzs } = await client.query(
         `INSERT INTO registro_piezas
            (registro_id, numero, posicion_rack, densidad, step_punto,
-            ni_sb, ni_br, ni_mps, dp_mp_br, dp_br_sb, poros)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+            ni_sb, ni_br, ni_mps, dp_mp_br, dp_br_sb, poros, ni_sb_pct, ni_br_pct)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
         [registro.id, i + 1, p.posicion_rack || null, p.densidad, numero(p.step_punto),
          numero(p.ni_sb), numero(p.ni_br), numero(p.ni_mps),
-         numero(p.dp_mp_br), numero(p.dp_br_sb), numero(p.poros)]
+         numero(p.dp_mp_br), numero(p.dp_br_sb), numero(p.poros),
+         numero(p.ni_sb_pct), numero(p.ni_br_pct)]
       );
       piezasCreadas.push({ id: pzs[0].id, numero: i + 1 });
       for (const m of (p.mediciones || [])) {
         const cr = numero(m.cr), niTotal = numero(m.ni_total), cu = numero(m.cu);
-        if (cr === null && niTotal === null && cu === null) continue;
+        const comentario = (m.comentario || '').trim() || null;
+        if (cr === null && niTotal === null && cu === null && !comentario) continue;
         await client.query(
-          `INSERT INTO registro_mediciones (pieza_id, punto, cr, ni_total, cu)
-           VALUES ($1,$2,$3,$4,$5)`,
-          [pzs[0].id, m.punto, cr, niTotal, cu]
+          `INSERT INTO registro_mediciones (pieza_id, punto, cr, ni_total, cu, comentario)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [pzs[0].id, m.punto, cr, niTotal, cu, comentario]
         );
       }
     }
@@ -230,13 +232,15 @@ router.put('/:id(\\d+)', requireQuimico(), async (req, res, next) => {
       const p = piezas[i];
       const valores = [p.posicion_rack || null, p.densidad, numero(p.step_punto),
         numero(p.ni_sb), numero(p.ni_br), numero(p.ni_mps),
-        numero(p.dp_mp_br), numero(p.dp_br_sb), numero(p.poros)];
+        numero(p.dp_mp_br), numero(p.dp_br_sb), numero(p.poros),
+        numero(p.ni_sb_pct), numero(p.ni_br_pct)];
       let piezaId;
       if (p.id && idsExistentes.includes(Number(p.id))) {
         await client.query(
           `UPDATE registro_piezas SET numero = $1, posicion_rack = $2, densidad = $3,
-             step_punto = $4, ni_sb = $5, ni_br = $6, ni_mps = $7, dp_mp_br = $8, dp_br_sb = $9, poros = $10
-           WHERE id = $11`,
+             step_punto = $4, ni_sb = $5, ni_br = $6, ni_mps = $7, dp_mp_br = $8, dp_br_sb = $9, poros = $10,
+             ni_sb_pct = $11, ni_br_pct = $12
+           WHERE id = $13`,
           [i + 1, ...valores, Number(p.id)]
         );
         piezaId = Number(p.id);
@@ -244,8 +248,8 @@ router.put('/:id(\\d+)', requireQuimico(), async (req, res, next) => {
         const { rows: pzs } = await client.query(
           `INSERT INTO registro_piezas
              (registro_id, numero, posicion_rack, densidad, step_punto,
-              ni_sb, ni_br, ni_mps, dp_mp_br, dp_br_sb, poros)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+              ni_sb, ni_br, ni_mps, dp_mp_br, dp_br_sb, poros, ni_sb_pct, ni_br_pct)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
           [id, i + 1, ...valores]
         );
         piezaId = pzs[0].id;
@@ -254,10 +258,11 @@ router.put('/:id(\\d+)', requireQuimico(), async (req, res, next) => {
       await client.query('DELETE FROM registro_mediciones WHERE pieza_id = $1', [piezaId]);
       for (const m of (p.mediciones || [])) {
         const cr = numero(m.cr), niTotal = numero(m.ni_total), cu = numero(m.cu);
-        if (cr === null && niTotal === null && cu === null) continue;
+        const comentario = (m.comentario || '').trim() || null;
+        if (cr === null && niTotal === null && cu === null && !comentario) continue;
         await client.query(
-          `INSERT INTO registro_mediciones (pieza_id, punto, cr, ni_total, cu) VALUES ($1,$2,$3,$4,$5)`,
-          [piezaId, m.punto, cr, niTotal, cu]
+          `INSERT INTO registro_mediciones (pieza_id, punto, cr, ni_total, cu, comentario) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [piezaId, m.punto, cr, niTotal, cu, comentario]
         );
       }
     }

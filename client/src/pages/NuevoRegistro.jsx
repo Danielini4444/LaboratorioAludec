@@ -12,9 +12,10 @@ const PIEZA_VACIA = (numero, densidad) => ({
   numero,
   posicion_rack: '',
   densidad,
-  mediciones: [{ punto: 1, cr: '', ni_total: '', cu: '' }, { punto: 2, cr: '', ni_total: '', cu: '' }],
+  mediciones: [{ punto: 1, cr: '', ni_total: '', cu: '', comentario: '' }, { punto: 2, cr: '', ni_total: '', cu: '', comentario: '' }],
   step_punto: '',
   ni_sb: '', ni_br: '', ni_mps: '', dp_mp_br: '', dp_br_sb: '',
+  ni_sb_pct: '', ni_br_pct: '',
   poros: '',
   fotos_step: [],
   fotos_poros: []
@@ -93,10 +94,11 @@ export default function NuevoRegistro() {
         });
         setPiezas(reg.piezas.map(p => ({
           id: p.id, numero: p.numero, posicion_rack: p.posicion_rack || '', densidad: p.densidad,
-          mediciones: (p.mediciones.length ? p.mediciones : [{ punto: 1, cr: null, ni_total: null, cu: null }])
-            .map(m => ({ punto: m.punto, cr: txt(m.cr), ni_total: txt(m.ni_total), cu: txt(m.cu) })),
+          mediciones: (p.mediciones.length ? p.mediciones : [{ punto: 1, cr: null, ni_total: null, cu: null, comentario: null }])
+            .map(m => ({ punto: m.punto, cr: txt(m.cr), ni_total: txt(m.ni_total), cu: txt(m.cu), comentario: txt(m.comentario) })),
           step_punto: txt(p.step_punto), ni_sb: txt(p.ni_sb), ni_br: txt(p.ni_br), ni_mps: txt(p.ni_mps),
           dp_mp_br: txt(p.dp_mp_br), dp_br_sb: txt(p.dp_br_sb), poros: txt(p.poros),
+          ni_sb_pct: txt(p.ni_sb_pct), ni_br_pct: txt(p.ni_br_pct),
           fotos_step: [], fotos_poros: []
         })));
         setResultadoManual(reg.resultado || '');
@@ -156,7 +158,7 @@ export default function NuevoRegistro() {
   const agregarPieza = () => setPiezas(ps => [...ps, PIEZA_VACIA(ps.length + 1, 'LCD')]);
   const quitarPieza = (i) => setPiezas(ps => ps.filter((_, j) => j !== i).map((p, j) => ({ ...p, numero: j + 1 })));
   const agregarPunto = (i) => setPiezas(ps => ps.map((p, j) =>
-    j === i ? { ...p, mediciones: [...p.mediciones, { punto: p.mediciones.length + 1, cr: '', ni_total: '', cu: '' }] } : p
+    j === i ? { ...p, mediciones: [...p.mediciones, { punto: p.mediciones.length + 1, cr: '', ni_total: '', cu: '', comentario: '' }] } : p
   ));
   const quitarPunto = (i, j) => setPiezas(ps => ps.map((p, k) =>
     k === i
@@ -334,6 +336,7 @@ export default function NuevoRegistro() {
                 <th>Cr (µm) <span className="espec-hint">{textoLimite(limites, 'cr')}</span></th>
                 <th>Ni total (µm) <span className="espec-hint">{textoLimite(limites, 'ni_t')}</span></th>
                 <th>Cu (µm) <span className="espec-hint">{textoLimite(limites, 'cu')}</span></th>
+                <th>Comentario</th>
                 <th aria-label="acciones"></th>
               </tr>
             </thead>
@@ -344,6 +347,9 @@ export default function NuevoRegistro() {
                   <CeldaMedicion valor={m.cr} onChange={v => setMedicion(i, j, 'cr', v)} limites={limites} clave="cr" />
                   <CeldaMedicion valor={m.ni_total} onChange={v => setMedicion(i, j, 'ni_total', v)} limites={limites} clave="ni_t" />
                   <CeldaMedicion valor={m.cu} onChange={v => setMedicion(i, j, 'cu', v)} limites={limites} clave="cu" />
+                  <td>
+                    <input type="text" value={m.comentario} onChange={e => setMedicion(i, j, 'comentario', e.target.value)} placeholder="—" />
+                  </td>
                   <td>
                     {p.mediciones.length > 1 && (
                       <button type="button" className="btn-quitar-fila" title="Quitar punto" onClick={() => quitarPunto(i, j)}>×</button>
@@ -369,6 +375,14 @@ export default function NuevoRegistro() {
                 />
               </label>
             ))}
+            <label>% Ni SB (del Ni total)
+              <input type="number" step="any" min="0" value={p.ni_sb_pct}
+                onChange={e => setPieza(i, { ni_sb_pct: e.target.value })} />
+            </label>
+            <label>% Ni Br (del Ni total)
+              <input type="number" step="any" min="0" value={p.ni_br_pct}
+                onChange={e => setPieza(i, { ni_br_pct: e.target.value })} />
+            </label>
             <label>Poros (poros/cm²) <span className="espec-hint">{textoLimite(limites, 'microporos')}</span>
               <input
                 type="number" min="0" step="1" value={p.poros}

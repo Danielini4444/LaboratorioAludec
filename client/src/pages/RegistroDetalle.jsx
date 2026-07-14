@@ -238,6 +238,7 @@ export default function RegistroDetalle() {
                   <th>Cr (µm) <span className="espec-hint">{textoLimite(limites, 'cr')}</span></th>
                   <th>Ni total (µm) <span className="espec-hint">{textoLimite(limites, 'ni_t')}</span></th>
                   <th>Cu (µm) <span className="espec-hint">{textoLimite(limites, 'cu')}</span></th>
+                  <th>Comentario</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,12 +248,13 @@ export default function RegistroDetalle() {
                     <Valor limites={limites} clave="cr" valor={m.cr} />
                     <Valor limites={limites} clave="ni_t" valor={m.ni_total} />
                     <Valor limites={limites} clave="cu" valor={m.cu} />
+                    <td>{m.comentario || '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-          {(p.ni_sb !== null || p.ni_br !== null || p.ni_mps !== null || p.dp_mp_br !== null || p.dp_br_sb !== null || p.poros !== null) && (
+          {(p.ni_sb !== null || p.ni_br !== null || p.ni_mps !== null || p.dp_mp_br !== null || p.dp_br_sb !== null || p.poros !== null || p.ni_sb_pct !== null || p.ni_br_pct !== null) && (
             <div className="tabla-scroll">
               <table className="tabla mediciones">
                 <thead>
@@ -261,6 +263,8 @@ export default function RegistroDetalle() {
                     <th>Ni SB (µm) <span className="espec-hint">{textoLimite(limites, 'sb_ni')}</span></th>
                     <th>Ni Br (µm) <span className="espec-hint">{textoLimite(limites, 'br_ni')}</span></th>
                     <th>Ni MPS (µm) <span className="espec-hint">{textoLimite(limites, 'mp_ni')}</span></th>
+                    <th>% Ni SB</th>
+                    <th>% Ni Br</th>
                     <th>ΔP MP–Br (mV) <span className="espec-hint">{textoLimite(limites, 'step_mp_br')}</span></th>
                     <th>ΔP Br–SB (mV) <span className="espec-hint">{textoLimite(limites, 'step_br_sb')}</span></th>
                     <th>Poros <span className="espec-hint">{textoLimite(limites, 'microporos')}</span></th>
@@ -272,6 +276,8 @@ export default function RegistroDetalle() {
                     <Valor limites={limites} clave="sb_ni" valor={p.ni_sb} base={niTotalBase(p)} />
                     <Valor limites={limites} clave="br_ni" valor={p.ni_br} base={niTotalBase(p)} />
                     <Valor limites={limites} clave="mp_ni" valor={p.ni_mps} base={niTotalBase(p)} />
+                    <td>{p.ni_sb_pct ?? '—'}{p.ni_sb_pct != null ? ' %' : ''}</td>
+                    <td>{p.ni_br_pct ?? '—'}{p.ni_br_pct != null ? ' %' : ''}</td>
                     <Valor limites={limites} clave="step_mp_br" valor={p.dp_mp_br} />
                     <Valor limites={limites} clave="step_br_sb" valor={p.dp_br_sb} />
                     <Valor limites={limites} clave="microporos" valor={p.poros} />
