@@ -5,6 +5,7 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 
 const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
+const LOGO = path.join(__dirname, '..', '..', 'assets', 'logo.png');
 // Paleta styles.md §7: gris oscuro de marca (naranja se reserva para acentos).
 const PRIMARIO = '#1d252d';
 const FONDO = '#eceded';
@@ -14,7 +15,7 @@ const ANCHO_UTIL = 612 - 2 * MARGEN;
 const LIMITE_Y = 700; // a partir de aquí se salta de página
 
 // Datos fijos del proceso, como vienen en su formato.
-const PROCESO = { numero: '1450', descripcion: 'CHROME PLATED', taller: 'ALUDEC AUTOMOCION' };
+const PROCESO = { numero: '1450', descripcion: 'CHROME PLATED', taller: 'CIE ALUDEC AUTOMOCION' };
 
 function fecha(d) {
   if (!d) return '—';
@@ -101,11 +102,12 @@ function tabla(doc, x, columnas, filas, altoEncabezado = 26) {
 }
 
 function encabezado(doc, titulo, registro) {
-  // banda con título
-  doc.rect(MARGEN, MARGEN, ANCHO_UTIL - 150, 38).fillAndStroke(PRIMARIO, PRIMARIO);
-  doc.fillColor('white').font('Helvetica-Bold').fontSize(13)
-    .text('ALUDEC', MARGEN + 8, MARGEN + 12);
-  doc.fontSize(13).text(titulo, MARGEN + 90, MARGEN + 12, { width: ANCHO_UTIL - 260, align: 'center' });
+  // logo CIE Aludec sobre el blanco + banda de título
+  try { doc.image(LOGO, MARGEN, MARGEN + 5, { height: 28 }); } catch { /* sin logo: solo banda */ }
+  const bandaX = MARGEN + 115;
+  doc.rect(bandaX, MARGEN, ANCHO_UTIL - 150 - 115, 38).fillAndStroke(PRIMARIO, PRIMARIO);
+  doc.fillColor('white').font('Helvetica-Bold')
+    .fontSize(13).text(titulo, bandaX + 6, MARGEN + 12, { width: ANCHO_UTIL - 150 - 115 - 12, align: 'center' });
   // recuadro de formato
   const fx = MARGEN + ANCHO_UTIL - 145;
   doc.rect(fx, MARGEN, 145, 38).strokeColor(BORDE).stroke();
