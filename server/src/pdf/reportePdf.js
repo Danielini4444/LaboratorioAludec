@@ -8,6 +8,7 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 
 const UPLOADS = path.join(__dirname, '..', '..', 'uploads');
+const LOGO = path.join(__dirname, '..', '..', 'assets', 'logo.png');
 // Paleta styles.md §7: gris oscuro de marca (naranja se reserva para acentos).
 const PRIMARIO = '#1d252d';
 const PRIMARIO_HOVER = '#333f48';
@@ -91,10 +92,12 @@ module.exports = function generarReportePdf(stream, reporte) {
   };
 
   // ===== Encabezado =====
-  doc.rect(MARGEN, MARGEN, ANCHO_UTIL - 150, 38).fillAndStroke(PRIMARIO, PRIMARIO);
-  doc.fillColor('white').font('Helvetica-Bold').fontSize(13)
-    .text('ALUDEC', MARGEN + 8, MARGEN + 12);
-  doc.fontSize(12).text('INFORME DE ENSAYOS / TEST REPORT', MARGEN + 90, MARGEN + 13, { width: ANCHO_UTIL - 260, align: 'center' });
+  // logo CIE Aludec sobre el blanco + banda de título
+  try { doc.image(LOGO, MARGEN, MARGEN + 5, { height: 28 }); } catch { /* sin logo: solo banda */ }
+  const bandaX = MARGEN + 115;
+  doc.rect(bandaX, MARGEN, ANCHO_UTIL - 150 - 115, 38).fillAndStroke(PRIMARIO, PRIMARIO);
+  doc.fillColor('white').font('Helvetica-Bold')
+    .fontSize(12).text('INFORME DE ENSAYOS / TEST REPORT', bandaX + 6, MARGEN + 13, { width: ANCHO_UTIL - 150 - 115 - 12, align: 'center' });
   const fx = MARGEN + ANCHO_UTIL - 145;
   doc.rect(fx, MARGEN, 145, 38).strokeColor('black').lineWidth(1.2).stroke();
   doc.fillColor(GRIS).font('Helvetica').fontSize(6.5).text('Nº Ensayo / Report No.', fx + 4, MARGEN + 5, { width: 137, align: 'center' });
@@ -104,7 +107,7 @@ module.exports = function generarReportePdf(stream, reporte) {
   doc.y = MARGEN + 46;
 
   doc.fontSize(7).fillColor(GRIS).font('Helvetica')
-    .text(`Código / Code: FM-15-30   ·   Emisión / Issue date: ${reporte.fecha_emision ? fecha(reporte.fecha_emision) : 'pendiente / pending'}   ·   ALUDEC AUTOMOCION`,
+    .text(`Código / Code: FM-15-30   ·   Emisión / Issue date: ${reporte.fecha_emision ? fecha(reporte.fecha_emision) : 'pendiente / pending'}   ·   CIE ALUDEC AUTOMOCION`,
       MARGEN, doc.y, { width: ANCHO_UTIL, align: 'center' });
   doc.fillColor('black');
   doc.y += 10;
