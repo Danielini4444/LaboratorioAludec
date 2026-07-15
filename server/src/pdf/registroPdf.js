@@ -201,20 +201,23 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
   const fotosDe = (piezaId, seccion) =>
     (registro.imagenes || []).filter(img => img.pieza_id === piezaId && img.seccion === seccion && existe(img));
 
-  // fila de fotos con salto de página y tamaño dado
+  // filas de fotos CENTRADAS, con salto de página y tamaño dado. Cada fila
+  // se centra en el ancho útil; cada foto se centra dentro de su recuadro.
   const filaFotos = (lista, ancho, alto) => {
-    let x = MARGEN;
-    let filaAlto = 0;
-    for (const img of lista) {
-      if (x + ancho > MARGEN + ANCHO_UTIL) { x = MARGEN; doc.y += filaAlto + 8; filaAlto = 0; }
-      if (doc.y + alto + 6 > LIMITE_Y) { doc.addPage(); x = MARGEN; filaAlto = 0; }
-      try {
-        doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 3, { fit: [ancho, alto] });
+    const porFila = Math.max(1, Math.floor((ANCHO_UTIL + 12) / (ancho + 12)));
+    for (let i = 0; i < lista.length; i += porFila) {
+      const grupo = lista.slice(i, i + porFila);
+      if (doc.y + alto + 6 > LIMITE_Y) doc.addPage();
+      const anchoGrupo = grupo.length * ancho + (grupo.length - 1) * 12;
+      let x = MARGEN + (ANCHO_UTIL - anchoGrupo) / 2;
+      for (const img of grupo) {
+        try {
+          doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 3, { fit: [ancho, alto], align: 'center', valign: 'center' });
+        } catch { /* ilegible: se omite */ }
         x += ancho + 12;
-        filaAlto = Math.max(filaAlto, alto + 6);
-      } catch { /* ilegible: se omite */ }
+      }
+      doc.y += alto + 8;
     }
-    doc.y += filaAlto + 8;
     doc.x = MARGEN;
   };
 
@@ -222,19 +225,19 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
   if (secciones.thickness) {
   paginaDeSeccion('THICKNESS TEST REPORT');
 
-  // fotos de muestra (puntos de medición)
+  // foto(s) de muestra (puntos de medición): a ancho completo (el de una
+  // línea de texto) y centradas.
   const fotos = (registro.imagenes || []).filter(img => !img.pieza_id && existe(img));
   if (fotos.length) {
     tabla(doc, MARGEN, [{ titulo: 'SAMPLE', ancho: ANCHO_UTIL }], [], 12);
-    let x = MARGEN + 10;
-    const yFotos = doc.y;
+    const altoSample = 380;
     for (const img of fotos.slice(0, 3)) {
+      if (doc.y + altoSample + 6 > LIMITE_Y) doc.addPage();
       try {
-        doc.image(path.join(UPLOADS, img.archivo), x, yFotos, { fit: [155, 110] });
-        x += 165;
+        doc.image(path.join(UPLOADS, img.archivo), MARGEN, doc.y + 3, { fit: [ANCHO_UTIL, altoSample], align: 'center', valign: 'center' });
       } catch { /* ilegible: se omite */ }
+      doc.y += altoSample + 8;
     }
-    doc.y = yFotos + 118;
   }
 
   doc.font('Helvetica-Bold').fontSize(10).text('Thickness measurement', MARGEN, doc.y, { width: ANCHO_UTIL, align: 'center' });
