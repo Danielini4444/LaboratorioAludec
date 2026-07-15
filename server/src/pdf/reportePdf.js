@@ -46,12 +46,17 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     ? { texto: 'ANULADO / VOID', color: '#f3d0d0' }
     : { texto: 'BORRADOR / DRAFT', color: '#ececec' };
   const marcaAgua = () => {
+    // El texto de la marca mueve doc.x/doc.y (los deja donde termina, ~mitad
+    // de página). Hay que restaurarlos: si no, tras cada addPage el contenido
+    // empieza a media página y las fotos quedan con un hueco enorme arriba.
+    const xPrev = doc.x, yPrev = doc.y;
     doc.save();
     doc.rotate(-45, { origin: [306, 396] });
     doc.fontSize(54).fillColor(marca.color).font('Helvetica-Bold')
       .text(marca.texto, 0, 366, { width: 612, align: 'center' });
     doc.restore();
     doc.fillColor('black');
+    doc.x = xPrev; doc.y = yPrev;
   };
   if (esAnulado || esBorrador) {
     marcaAgua();
@@ -183,9 +188,7 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     // limita al ancho del texto y va sola en su fila.
     const fotos = (p.imagenes || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
     if (fotos.length) {
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
-      doc.fillColor('black');
-      const ALTO = 160, sep = 12, MARGEN_FOTO = 5;
+      const ALTO = 160, sep = 12, MARGEN_FOTO = 5, ALTO_ETIQUETA = 12;
       const items = fotos.map(img => {
         try {
           const im = doc.openImage(path.join(UPLOADS, img.archivo));
@@ -195,26 +198,36 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
         } catch { return null; }
       }).filter(Boolean);
 
-      const dibujarFila = (fila) => {
-        if (!fila.length) return;
-        const altoFila = Math.max(...fila.map(d => d.h));
-        if (doc.y + altoFila + 2 * MARGEN_FOTO > LIMITE_Y) doc.addPage();
-        const total = fila.reduce((a, d) => a + d.w, 0) + (fila.length - 1) * sep;
+      // Empacar en filas (varias fotos por fila mientras quepan a lo ancho).
+      const filas = []; let fila = [], ancho = 0;
+      for (const d of items) {
+        if (fila.length && ancho + sep + d.w > ANCHO_UTIL) { filas.push(fila); fila = []; ancho = 0; }
+        ancho += (fila.length ? sep : 0) + d.w;
+        fila.push(d);
+      }
+      if (fila.length) filas.push(fila);
+      const altoDe = f => Math.max(...f.map(d => d.h)) + 2 * MARGEN_FOTO;
+
+      // Mantener la etiqueta y TODAS las fotos de la prueba juntas: si el bloque
+      // no cabe en lo que queda pero sí en una página nueva, se salta antes de
+      // la etiqueta (evita etiqueta huérfana y fotos solas en página vacía).
+      const bloqueH = ALTO_ETIQUETA + filas.reduce((a, f) => a + altoDe(f), 0);
+      if (filas.length && doc.y + bloqueH > LIMITE_Y && bloqueH <= LIMITE_Y - MARGEN) doc.addPage();
+
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
+      doc.fillColor('black');
+
+      for (const f of filas) {
+        const altoFila = Math.max(...f.map(d => d.h));
+        if (doc.y + altoFila + 2 * MARGEN_FOTO > LIMITE_Y) doc.addPage(); // respaldo (bloque más alto que una página)
+        const total = f.reduce((a, d) => a + d.w, 0) + (f.length - 1) * sep;
         let x = MARGEN + (ANCHO_UTIL - total) / 2;
-        for (const d of fila) {
+        for (const d of f) {
           try { doc.image(path.join(UPLOADS, d.archivo), x, doc.y + MARGEN_FOTO, { width: d.w, height: d.h }); } catch { /* ilegible: se omite */ }
           x += d.w + sep;
         }
         doc.y += altoFila + 2 * MARGEN_FOTO; // 5px arriba + foto + 5px abajo
-      };
-
-      let fila = [], ancho = 0;
-      for (const d of items) {
-        if (fila.length && ancho + sep + d.w > ANCHO_UTIL) { dibujarFila(fila); fila = []; ancho = 0; }
-        ancho += (fila.length ? sep : 0) + d.w;
-        fila.push(d);
       }
-      dibujarFila(fila);
       doc.x = MARGEN;
     }
     doc.y += 4;

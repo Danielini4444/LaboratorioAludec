@@ -178,12 +178,16 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
   // Marca de agua ANULADO/VOID en cada página cuando el registro está anulado.
   if (registro.anulado_por) {
     const marcaAgua = () => {
+      // Restaurar doc.x/doc.y: el texto de la marca los mueve a media página y,
+      // tras cada addPage, el contenido empezaría ahí (con hueco enorme arriba).
+      const xPrev = doc.x, yPrev = doc.y;
       doc.save();
       doc.rotate(-45, { origin: [306, 396] });
       doc.fontSize(60).fillColor('#f3d0d0').font('Helvetica-Bold')
         .text('ANULADO / VOID', 0, 360, { width: 612, align: 'center' });
       doc.restore();
       doc.fillColor('black');
+      doc.x = xPrev; doc.y = yPrev;
     };
     marcaAgua();
     doc.on('pageAdded', marcaAgua);
