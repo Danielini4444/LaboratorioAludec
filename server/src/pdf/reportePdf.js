@@ -177,24 +177,35 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     }
 
     // evidencia fotográfica: filas centradas en el ancho del texto, fotos un
-    // poco más grandes (sin pasar ese ancho) y con 5px de margen arriba y
-    // abajo de cada fila (antes se desfasaban por offsets irregulares).
+    // poco más grandes (sin pasar ese ancho). Se usa el ALTO REAL de cada foto
+    // (no el de un recuadro fijo) para que no quede hueco entre la foto y lo
+    // que sigue; 5px de margen arriba y abajo de cada fila.
     const fotos = (p.imagenes || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
     if (fotos.length) {
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
       doc.fillColor('black');
-      const anchoFoto = 250, altoFoto = 190, sep = 12;
-      const porFila = Math.max(1, Math.floor((ANCHO_UTIL + sep) / (anchoFoto + sep)));
+      const MARGEN_FOTO = 5, cajaAncho = 250, cajaAlto = 190, sep = 12;
+      const porFila = Math.max(1, Math.floor((ANCHO_UTIL + sep) / (cajaAncho + sep)));
       for (let i = 0; i < fotos.length; i += porFila) {
-        const grupo = fotos.slice(i, i + porFila);
-        if (doc.y + altoFoto + 10 > LIMITE_Y) doc.addPage();
-        const anchoGrupo = grupo.length * anchoFoto + (grupo.length - 1) * sep;
+        // dimensiones reales de cada foto escalada a su caja (preserva proporción)
+        const dims = fotos.slice(i, i + porFila).map(img => {
+          try {
+            const im = doc.openImage(path.join(UPLOADS, img.archivo));
+            const s = Math.min(cajaAncho / im.width, cajaAlto / im.height);
+            return { archivo: img.archivo, w: im.width * s, h: im.height * s };
+          } catch { return { archivo: img.archivo, w: 0, h: 0 }; }
+        });
+        const altoFila = Math.max(0, ...dims.map(d => d.h));
+        if (doc.y + altoFila + 2 * MARGEN_FOTO > LIMITE_Y) doc.addPage();
+        const anchoGrupo = dims.reduce((a, d) => a + d.w, 0) + (dims.length - 1) * sep;
         let x = MARGEN + (ANCHO_UTIL - anchoGrupo) / 2;
-        for (const img of grupo) {
-          try { doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 5, { fit: [anchoFoto, altoFoto], align: 'center', valign: 'center' }); } catch { /* ilegible: se omite */ }
-          x += anchoFoto + sep;
+        for (const d of dims) {
+          if (d.w) {
+            try { doc.image(path.join(UPLOADS, d.archivo), x, doc.y + MARGEN_FOTO, { width: d.w, height: d.h }); } catch { /* ilegible: se omite */ }
+          }
+          x += d.w + sep;
         }
-        doc.y += altoFoto + 10; // 5px arriba + foto + 5px abajo
+        doc.y += altoFila + 2 * MARGEN_FOTO; // 5px arriba + foto + 5px abajo
       }
       doc.x = MARGEN;
     }
