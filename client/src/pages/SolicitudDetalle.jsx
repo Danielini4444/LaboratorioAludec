@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { ESTADOS } from '../ensayosCatalogo.js';
 import { puedeSolicitar } from './SolicitudesEnsayo.jsx';
+import { useConfirmar } from '../components/Confirmar.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : '—');
@@ -25,6 +26,7 @@ function Campo({ etiqueta, valor }) {
 
 export default function SolicitudDetalle() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [solicitud, setSolicitud] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -32,6 +34,7 @@ export default function SolicitudDetalle() {
   const [cancelando, setCancelando] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [trabajando, setTrabajando] = useState(false);
+  const [confirmar, dialogoConfirmar] = useConfirmar();
 
   const recargar = () => api(`/solicitudes-ensayo/${id}`).then(setSolicitud).catch(() => setSolicitud(null));
 
@@ -58,6 +61,24 @@ export default function SolicitudDetalle() {
       setMotivo('');
     } catch (e) { setError(e.message); }
     finally { setTrabajando(false); }
+  };
+
+  // Borrado definitivo: solo admin global o admin de área.
+  const puedeBorrar = user.rol === 'admin' || user.rol === 'admin_area';
+
+  const borrar = async () => {
+    if (!await confirmar({
+      titulo: `Borrar solicitud ${solicitud.tipo}-${solicitud.folio}`,
+      mensaje: 'La solicitud se borra DEFINITIVAMENTE con sus líneas de ensayo, sin dejar traza (a diferencia de Cancelar). Esta acción no se puede deshacer.',
+      textoConfirmar: 'Borrar definitivamente',
+      peligro: true
+    })) return;
+    setError('');
+    setTrabajando(true);
+    try {
+      await api(`/solicitudes-ensayo/${id}`, { method: 'DELETE' });
+      navigate('/solicitudes');
+    } catch (e) { setError(e.message); setTrabajando(false); }
   };
 
   if (cargando) return <Cargando />;
@@ -91,6 +112,9 @@ export default function SolicitudDetalle() {
           )}
           {puedeCancelar && !cancelando && (
             <button className="secundario peligro" onClick={() => setCancelando(true)}>Cancelar</button>
+          )}
+          {puedeBorrar && (
+            <button className="secundario peligro" disabled={trabajando} onClick={borrar}>Borrar</button>
           )}
           <Link to="/solicitudes" className="boton secundario">Volver</Link>
         </div>
@@ -177,6 +201,7 @@ export default function SolicitudDetalle() {
           {s.estado === 'cancelada' && <Campo etiqueta="Motivo de cancelación" valor={s.motivo_cancelacion} />}
         </div>
       </div>
+      {dialogoConfirmar}
     </div>
   );
 }

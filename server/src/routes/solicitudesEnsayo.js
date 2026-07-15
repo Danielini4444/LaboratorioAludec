@@ -174,4 +174,17 @@ router.put('/:id(\\d+)/cancelar', requireRol('solicitante'), async (req, res, ne
   } catch (e) { next(e); }
 });
 
+// Borrado definitivo de la solicitud: solo admin global o admin de área
+// (requireRol deja pasar siempre al admin global). Las líneas de ensayo
+// caen en cascada. A diferencia de cancelar, no deja traza.
+router.delete('/:id(\\d+)', requireRol('admin_area'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'DELETE FROM solicitudes_ensayo WHERE id = $1 RETURNING id', [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

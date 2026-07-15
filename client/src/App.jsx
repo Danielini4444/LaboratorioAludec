@@ -87,7 +87,9 @@ function SinAcceso() {
 
 function Layout({ children }) {
   const { user, logout } = useAuth();
-  const veAdmin = user.rol === 'admin' || user.rol === 'auditor_admin';
+  // Admin global y admins de área (Químico y Metrología) entran a
+  // Administración; el auditor admin la ve en solo lectura.
+  const veAdmin = ['admin', 'auditor_admin', 'admin_area'].includes(user.rol);
   const iniciales = user.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
   return (
     <div className="app">
