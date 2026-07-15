@@ -176,37 +176,45 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
       tabla([{ titulo: '', ancho: 170 }, { titulo: '', ancho: 342 }], filasDetalle, 0.001);
     }
 
-    // evidencia fotográfica: filas centradas en el ancho del texto, fotos un
-    // poco más grandes (sin pasar ese ancho). Se usa el ALTO REAL de cada foto
-    // (no el de un recuadro fijo) para que no quede hueco entre la foto y lo
-    // que sigue; 5px de margen arriba y abajo de cada fila.
+    // evidencia fotográfica: cada foto se escala a una ALTURA UNIFORME, así
+    // todas las de una misma fila miden igual y no queda hueco debajo de las
+    // apaisadas (el problema anterior). Las filas van centradas en el ancho
+    // del texto, con 5px de margen arriba y abajo; una foto muy ancha se
+    // limita al ancho del texto y va sola en su fila.
     const fotos = (p.imagenes || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
     if (fotos.length) {
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
       doc.fillColor('black');
-      const MARGEN_FOTO = 5, cajaAncho = 250, cajaAlto = 190, sep = 12;
-      const porFila = Math.max(1, Math.floor((ANCHO_UTIL + sep) / (cajaAncho + sep)));
-      for (let i = 0; i < fotos.length; i += porFila) {
-        // dimensiones reales de cada foto escalada a su caja (preserva proporción)
-        const dims = fotos.slice(i, i + porFila).map(img => {
-          try {
-            const im = doc.openImage(path.join(UPLOADS, img.archivo));
-            const s = Math.min(cajaAncho / im.width, cajaAlto / im.height);
-            return { archivo: img.archivo, w: im.width * s, h: im.height * s };
-          } catch { return { archivo: img.archivo, w: 0, h: 0 }; }
-        });
-        const altoFila = Math.max(0, ...dims.map(d => d.h));
+      const ALTO = 160, sep = 12, MARGEN_FOTO = 5;
+      const items = fotos.map(img => {
+        try {
+          const im = doc.openImage(path.join(UPLOADS, img.archivo));
+          let h = ALTO, w = ALTO * (im.width / im.height);
+          if (w > ANCHO_UTIL) { w = ANCHO_UTIL; h = ANCHO_UTIL * (im.height / im.width); }
+          return { archivo: img.archivo, w, h };
+        } catch { return null; }
+      }).filter(Boolean);
+
+      const dibujarFila = (fila) => {
+        if (!fila.length) return;
+        const altoFila = Math.max(...fila.map(d => d.h));
         if (doc.y + altoFila + 2 * MARGEN_FOTO > LIMITE_Y) doc.addPage();
-        const anchoGrupo = dims.reduce((a, d) => a + d.w, 0) + (dims.length - 1) * sep;
-        let x = MARGEN + (ANCHO_UTIL - anchoGrupo) / 2;
-        for (const d of dims) {
-          if (d.w) {
-            try { doc.image(path.join(UPLOADS, d.archivo), x, doc.y + MARGEN_FOTO, { width: d.w, height: d.h }); } catch { /* ilegible: se omite */ }
-          }
+        const total = fila.reduce((a, d) => a + d.w, 0) + (fila.length - 1) * sep;
+        let x = MARGEN + (ANCHO_UTIL - total) / 2;
+        for (const d of fila) {
+          try { doc.image(path.join(UPLOADS, d.archivo), x, doc.y + MARGEN_FOTO, { width: d.w, height: d.h }); } catch { /* ilegible: se omite */ }
           x += d.w + sep;
         }
         doc.y += altoFila + 2 * MARGEN_FOTO; // 5px arriba + foto + 5px abajo
+      };
+
+      let fila = [], ancho = 0;
+      for (const d of items) {
+        if (fila.length && ancho + sep + d.w > ANCHO_UTIL) { dibujarFila(fila); fila = []; ancho = 0; }
+        ancho += (fila.length ? sep : 0) + d.w;
+        fila.push(d);
       }
+      dibujarFila(fila);
       doc.x = MARGEN;
     }
     doc.y += 4;
