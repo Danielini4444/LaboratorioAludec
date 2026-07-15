@@ -133,6 +133,11 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     { titulo: 'PIEZAS / PIECES', ancho: 92 }
   ], [[reporte.referencia, reporte.denominacion, fecha(reporte.fecha_recepcion), reporte.cantidad_piezas]], 18);
 
+  tabla([
+    { titulo: 'ANALISTA / ANALYST', ancho: 256 },
+    { titulo: 'EMISIÓN / ISSUE DATE', ancho: 256 }
+  ], [[reporte.realizado_por_nombre, reporte.fecha_emision ? fecha(reporte.fecha_emision) : 'pendiente / pending']]);
+
   if (reporte.descripcion_material) {
     tabla([{ titulo: 'DESCRIPCIÓN DEL MATERIAL ENSAYADO / TESTED MATERIAL DESCRIPTION', ancho: ANCHO_UTIL }],
       [[reporte.descripcion_material]]);
