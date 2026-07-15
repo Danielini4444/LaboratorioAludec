@@ -176,23 +176,26 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
       tabla([{ titulo: '', ancho: 170 }, { titulo: '', ancho: 342 }], filasDetalle, 0.001);
     }
 
-    // evidencia fotográfica
+    // evidencia fotográfica: filas centradas en el ancho del texto, fotos un
+    // poco más grandes (sin pasar ese ancho) y con 5px de margen arriba y
+    // abajo de cada fila (antes se desfasaban por offsets irregulares).
     const fotos = (p.imagenes || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
     if (fotos.length) {
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
       doc.fillColor('black');
-      let x = MARGEN;
-      let filaAlto = 0;
-      for (const img of fotos) {
-        if (x + 240 > MARGEN + ANCHO_UTIL) { x = MARGEN; doc.y += filaAlto + 8; filaAlto = 0; }
-        if (doc.y + 165 > LIMITE_Y) { doc.addPage(); x = MARGEN; filaAlto = 0; }
-        try {
-          doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 4, { fit: [240, 160] });
-          x += 252;
-          filaAlto = Math.max(filaAlto, 168);
-        } catch { /* ilegible: se omite */ }
+      const anchoFoto = 250, altoFoto = 190, sep = 12;
+      const porFila = Math.max(1, Math.floor((ANCHO_UTIL + sep) / (anchoFoto + sep)));
+      for (let i = 0; i < fotos.length; i += porFila) {
+        const grupo = fotos.slice(i, i + porFila);
+        if (doc.y + altoFoto + 10 > LIMITE_Y) doc.addPage();
+        const anchoGrupo = grupo.length * anchoFoto + (grupo.length - 1) * sep;
+        let x = MARGEN + (ANCHO_UTIL - anchoGrupo) / 2;
+        for (const img of grupo) {
+          try { doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 5, { fit: [anchoFoto, altoFoto], align: 'center', valign: 'center' }); } catch { /* ilegible: se omite */ }
+          x += anchoFoto + sep;
+        }
+        doc.y += altoFoto + 10; // 5px arriba + foto + 5px abajo
       }
-      doc.y += filaAlto + 10;
       doc.x = MARGEN;
     }
     doc.y += 4;
