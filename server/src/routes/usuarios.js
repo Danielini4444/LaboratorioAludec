@@ -1,9 +1,23 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { query } = require('../db');
-const { requireRol } = require('../auth');
+const { requireAuth, requireRol } = require('../auth');
 
 const router = express.Router();
+
+// Lista mínima (id + nombre) de usuarios activos para los <select> de
+// "Realizó / Analista" en la captura. Accesible a cualquier autenticado
+// (los capturistas de área la necesitan y no ven la Administración).
+router.get('/seleccionables', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT u.id, u.nombre, u.rol, a.nombre AS area_nombre
+       FROM usuarios u LEFT JOIN areas a ON a.id = u.area_id
+       WHERE u.activo ORDER BY u.nombre`
+    );
+    res.json(rows);
+  } catch (e) { next(e); }
+});
 const ROLES = ['admin', 'auditor', 'auditor_admin', 'solicitante', 'admin_area', 'usuario_area'];
 
 function validarRolArea(rol, areaId) {

@@ -1,26 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
+import { useAuth } from '../App.jsx';
 import { val } from '../validaciones.js';
 
 const AREAS_SOLICITANTES = ['Control Proceso', 'Calidad', 'Producción', 'Ingeniería'];
 
 const FORM_VACIO = {
   cliente_id: '', referencia: '', denominacion: '', proyecto: '', area_solicitante: '',
-  descripcion_material: '', of: '', fecha_recepcion: '', cantidad_piezas: '', informacion_previa: ''
+  descripcion_material: '', of: '', fecha_recepcion: '', cantidad_piezas: '', informacion_previa: '',
+  realizado_por: ''
 };
 
 export default function NuevoReporte() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ ...FORM_VACIO });
+  const { user } = useAuth();
+  const [form, setForm] = useState({ ...FORM_VACIO, realizado_por: String(user.id) });
   const [clientes, setClientes] = useState([]);
   const [piezas, setPiezas] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     api('/clientes').then(setClientes).catch(() => {});
     api('/piezas').then(ps => setPiezas(ps.filter(p => p.activa))).catch(() => {});
+    api('/usuarios/seleccionables').then(setUsuarios).catch(() => {});
   }, []);
 
   const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
@@ -55,7 +60,8 @@ export default function NuevoReporte() {
           ...form,
           cliente_id: Number(form.cliente_id),
           cantidad_piezas: form.cantidad_piezas ? Number(form.cantidad_piezas) : null,
-          fecha_recepcion: form.fecha_recepcion || null
+          fecha_recepcion: form.fecha_recepcion || null,
+          realizado_por: form.realizado_por ? Number(form.realizado_por) : null
         }
       });
       navigate(`/reportes/${reporte.id}`);
@@ -118,6 +124,12 @@ export default function NuevoReporte() {
           </label>
           <label>Cantidad de piezas recibidas
             <input type="number" min="1" step="1" value={form.cantidad_piezas} onChange={set('cantidad_piezas')} />
+          </label>
+          <label>Analista (realizó)
+            <select value={form.realizado_por} onChange={set('realizado_por')} required>
+              <option value="">— elegir —</option>
+              {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+            </select>
           </label>
         </div>
         <div className="fila">

@@ -156,10 +156,14 @@ function FormCabecera({ reporte, onGuardada, onCancelar }) {
     descripcion_material: reporte.descripcion_material || '',
     fecha_recepcion: reporte.fecha_recepcion ? reporte.fecha_recepcion.slice(0, 10) : '',
     cantidad_piezas: reporte.cantidad_piezas != null ? String(reporte.cantidad_piezas) : '',
-    informacion_previa: reporte.informacion_previa || ''
+    informacion_previa: reporte.informacion_previa || '',
+    realizado_por: reporte.realizado_por != null ? String(reporte.realizado_por) : ''
   });
+  const [usuarios, setUsuarios] = useState([]);
   const [error, setError] = useState('');
   const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
+
+  useEffect(() => { api('/usuarios/seleccionables').then(setUsuarios).catch(() => {}); }, []);
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -174,7 +178,8 @@ function FormCabecera({ reporte, onGuardada, onCancelar }) {
           descripcion_material: form.descripcion_material,
           informacion_previa: form.informacion_previa,
           fecha_recepcion: form.fecha_recepcion || null,
-          cantidad_piezas: form.cantidad_piezas ? Number(form.cantidad_piezas) : null
+          cantidad_piezas: form.cantidad_piezas ? Number(form.cantidad_piezas) : null,
+          realizado_por: form.realizado_por ? Number(form.realizado_por) : null
         }
       });
       onGuardada();
@@ -195,6 +200,12 @@ function FormCabecera({ reporte, onGuardada, onCancelar }) {
       <div className="fila">
         <label>Fecha de recepción<input type="date" value={form.fecha_recepcion} onChange={set('fecha_recepcion')} /></label>
         <label>Piezas recibidas<input type="number" min="1" step="1" value={form.cantidad_piezas} onChange={set('cantidad_piezas')} /></label>
+        <label>Analista (realizó)
+          <select value={form.realizado_por} onChange={set('realizado_por')}>
+            <option value="">— elegir —</option>
+            {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+          </select>
+        </label>
       </div>
       <label>Descripción del material ensayado
         <input value={form.descripcion_material} onChange={set('descripcion_material')} placeholder="ej. pieza completa cromada…" />

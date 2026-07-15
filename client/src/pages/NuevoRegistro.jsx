@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../api.js';
+import { useAuth } from '../App.jsx';
 import { textoLimite, fueraDeLimite, niTotalBase } from '../especs.js';
 import { val } from '../validaciones.js';
 import CargaFotos from '../components/CargaFotos.jsx';
@@ -55,18 +56,21 @@ function CeldaMedicion({ valor, onChange, limites, clave }) {
 
 export default function NuevoRegistro() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { id } = useParams();
   const edicion = Boolean(id);
   const [cargandoReg, setCargandoReg] = useState(edicion);
   const normaDeseada = useRef(null);
   const [clientes, setClientes] = useState([]);
   const [piezasCatalogo, setPiezasCatalogo] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [especs, setEspecs] = useState([]);
   const [especId, setEspecId] = useState('');
 
   const [cabecera, setCabecera] = useState({
     cliente_id: '', referencia: '', denominacion: '', of: '', barra: '',
-    fecha_produccion: '', fecha_prueba: new Date().toISOString().slice(0, 10), observaciones: ''
+    fecha_produccion: '', fecha_prueba: new Date().toISOString().slice(0, 10), observaciones: '',
+    realizado_por: String(user.id)
   });
   const [piezas, setPiezas] = useState([PIEZA_VACIA(1, 'HCD'), PIEZA_VACIA(2, 'LCD')]);
   const [resultadoManual, setResultadoManual] = useState('');
@@ -77,6 +81,7 @@ export default function NuevoRegistro() {
   useEffect(() => {
     api('/clientes').then(setClientes).catch(() => {});
     api('/piezas').then(ps => setPiezasCatalogo(ps.filter(p => p.activa))).catch(() => {});
+    api('/usuarios/seleccionables').then(setUsuarios).catch(() => {});
   }, []);
 
   // en edición: cargar el registro y prefijar el formulario
@@ -91,7 +96,8 @@ export default function NuevoRegistro() {
           of: reg.of || '', barra: reg.barra || '',
           fecha_produccion: reg.fecha_produccion ? reg.fecha_produccion.slice(0, 10) : '',
           fecha_prueba: reg.fecha_prueba ? reg.fecha_prueba.slice(0, 10) : '',
-          observaciones: reg.observaciones || ''
+          observaciones: reg.observaciones || '',
+          realizado_por: reg.realizado_por != null ? String(reg.realizado_por) : ''
         });
         setPiezas(reg.piezas.map(p => ({
           id: p.id, numero: p.numero, posicion_rack: p.posicion_rack || '', densidad: p.densidad,
@@ -231,6 +237,7 @@ export default function NuevoRegistro() {
         norma: espec ? espec.norma : (normaDeseada.current || null),
         fecha_produccion: cabecera.fecha_produccion || null,
         resultado: resultado || null,
+        realizado_por: cabecera.realizado_por ? Number(cabecera.realizado_por) : null,
         piezas: piezas.map(({ fotos_espesores, fotos_step, fotos_poros, ...p }) => p) // conserva id en edición
       };
 
@@ -425,6 +432,12 @@ export default function NuevoRegistro() {
               <option value="">—</option>
               <option value="PASS">PASS</option>
               <option value="FAIL">FAIL</option>
+            </select>
+          </label>
+          <label>Realizó
+            <select value={cabecera.realizado_por} onChange={set('realizado_por')} required>
+              <option value="">— elegir —</option>
+              {usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
             </select>
           </label>
           <label>Observaciones

@@ -128,7 +128,7 @@ router.post('/', requireQuimico(), async (req, res, next) => {
        RETURNING *`,
       [cliente_id, norma || null, referencia.trim(), denominacion.trim(), of || null, barra || null,
        fecha_produccion || null, fecha_prueba || null, resultado || null, observaciones || null,
-       req.session.user.id]
+       req.body.realizado_por || req.session.user.id]
     );
     const registro = regs[0];
     const piezasCreadas = [];
@@ -209,10 +209,12 @@ router.put('/:id(\\d+)', requireQuimico(), async (req, res, next) => {
     await client.query(
       `UPDATE registros_espesores SET cliente_id = $1, norma = $2, referencia = $3,
          denominacion = $4, of = $5, barra = $6, fecha_produccion = $7,
-         fecha_prueba = coalesce($8, current_date), resultado = $9, observaciones = $10
+         fecha_prueba = coalesce($8, current_date), resultado = $9, observaciones = $10,
+         realizado_por = coalesce($12, realizado_por)
        WHERE id = $11`,
       [cliente_id, norma || null, referencia.trim(), denominacion.trim(), of || null, barra || null,
-       fecha_produccion || null, fecha_prueba || null, resultado || null, observaciones || null, id]
+       fecha_produccion || null, fecha_prueba || null, resultado || null, observaciones || null, id,
+       req.body.realizado_por || null]
     );
 
     // piezas: actualizar las existentes por id, insertar nuevas, borrar las quitadas

@@ -94,7 +94,7 @@ router.post('/', requireArea(AREA), async (req, res, next) => {
        VALUES (nextval('ens_folio_seq'), $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [cliente_id, referencia.trim(), denominacion.trim(), proyecto || null, area_solicitante || null,
        descripcion_material || null, of || null, fecha_recepcion || null,
-       cantidad_piezas || null, informacion_previa || null, req.session.user.id]
+       cantidad_piezas || null, informacion_previa || null, req.body.realizado_por || req.session.user.id]
     );
     // pieza nueva → catálogo
     await query(
@@ -113,7 +113,7 @@ router.post('/', requireArea(AREA), async (req, res, next) => {
 router.put('/:id(\\d+)', requireArea(AREA), async (req, res, next) => {
   try {
     const { proyecto, area_solicitante, descripcion_material, of,
-            fecha_recepcion, cantidad_piezas, informacion_previa } = req.body;
+            fecha_recepcion, cantidad_piezas, informacion_previa, realizado_por } = req.body;
     const { rows } = await query(
       `UPDATE reportes_ensayo SET
          proyecto = COALESCE($1, proyecto),
@@ -122,10 +122,11 @@ router.put('/:id(\\d+)', requireArea(AREA), async (req, res, next) => {
          of = COALESCE($4, of),
          fecha_recepcion = COALESCE($5, fecha_recepcion),
          cantidad_piezas = COALESCE($6, cantidad_piezas),
-         informacion_previa = COALESCE($7, informacion_previa)
+         informacion_previa = COALESCE($7, informacion_previa),
+         realizado_por = COALESCE($9, realizado_por)
        WHERE id = $8 AND aprobado_por IS NULL AND anulado_por IS NULL RETURNING *`,
       [proyecto, area_solicitante, descripcion_material, of,
-       fecha_recepcion, cantidad_piezas, informacion_previa, req.params.id]
+       fecha_recepcion, cantidad_piezas, informacion_previa, req.params.id, realizado_por || null]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Reporte no encontrado, ya aprobado o anulado' });
     res.json(rows[0]);
