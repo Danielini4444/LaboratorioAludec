@@ -46,7 +46,7 @@ Módulos:
 
 ## 5. Administración
 
-- Pestañas **Usuarios, Piezas, Normas, Equipos y Clientes**. Solo el **admin global** edita; el auditor admin la ve en solo lectura.
+- Pestañas **Usuarios, Piezas, Normas, Equipos y Clientes**. Editan el **admin global** y los **admins de área** (Químico y Metrología); el auditor admin la ve en solo lectura.
 - Todo se edita **por fila** (botón *Editar* → Guardar/Cancelar): usuarios (nombre, rol y área; contraseña y activar/desactivar con sus propios botones), piezas (referencia, denominación y cliente), equipos (nombre, ID interno y fecha de calibración — se pueden vaciar), clientes (renombrar) y normas (límites por cliente).
 - Nada se borra de los catálogos: usuarios, piezas, equipos y normas se **desactivan** (dejan de aparecer para capturar, pero lo histórico los conserva).
 
