@@ -144,6 +144,73 @@ function FormPrueba({ reporte, equipos, prueba, onGuardada, onCancelar }) {
   );
 }
 
+const AREAS_SOLICITANTES = ['Control Proceso', 'Calidad', 'Producción', 'Ingeniería'];
+
+// Edita los datos de cabecera del reporte (OF, área solicitante, proyecto,
+// recepción, piezas, material, información previa) mientras no esté aprobado.
+function FormCabecera({ reporte, onGuardada, onCancelar }) {
+  const [form, setForm] = useState({
+    of: reporte.of || '',
+    area_solicitante: reporte.area_solicitante || '',
+    proyecto: reporte.proyecto || '',
+    descripcion_material: reporte.descripcion_material || '',
+    fecha_recepcion: reporte.fecha_recepcion ? reporte.fecha_recepcion.slice(0, 10) : '',
+    cantidad_piezas: reporte.cantidad_piezas != null ? String(reporte.cantidad_piezas) : '',
+    informacion_previa: reporte.informacion_previa || ''
+  });
+  const [error, setError] = useState('');
+  const set = (campo) => (e) => setForm({ ...form, [campo]: e.target.value });
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await api(`/reportes/${reporte.id}`, {
+        method: 'PUT',
+        body: {
+          of: form.of,
+          area_solicitante: form.area_solicitante,
+          proyecto: form.proyecto,
+          descripcion_material: form.descripcion_material,
+          informacion_previa: form.informacion_previa,
+          fecha_recepcion: form.fecha_recepcion || null,
+          cantidad_piezas: form.cantidad_piezas ? Number(form.cantidad_piezas) : null
+        }
+      });
+      onGuardada();
+    } catch (e) { setError(e.message); }
+  };
+
+  return (
+    <form className="tarjeta formulario" onSubmit={enviar}>
+      <h3>Editar datos del reporte</h3>
+      <div className="fila">
+        <label>OF<input value={form.of} onChange={set('of')} {...val('of')} inputMode="numeric" placeholder="la asigna producción" /></label>
+        <label>Área solicitante
+          <input value={form.area_solicitante} onChange={set('area_solicitante')} list="edit-areas" placeholder="Control Proceso, Calidad…" />
+          <datalist id="edit-areas">{AREAS_SOLICITANTES.map(a => <option key={a} value={a} />)}</datalist>
+        </label>
+        <label>Proyecto<input value={form.proyecto} onChange={set('proyecto')} {...val('proyecto')} /></label>
+      </div>
+      <div className="fila">
+        <label>Fecha de recepción<input type="date" value={form.fecha_recepcion} onChange={set('fecha_recepcion')} /></label>
+        <label>Piezas recibidas<input type="number" min="1" step="1" value={form.cantidad_piezas} onChange={set('cantidad_piezas')} /></label>
+      </div>
+      <label>Descripción del material ensayado
+        <input value={form.descripcion_material} onChange={set('descripcion_material')} placeholder="ej. pieza completa cromada…" />
+      </label>
+      <label>Información previa
+        <input value={form.informacion_previa} onChange={set('informacion_previa')} placeholder="ej. piezas de validación Satin Chrome SM322" />
+      </label>
+      {error && <div className="error">{error}</div>}
+      <div className="acciones">
+        <button type="submit">Guardar datos</button>
+        <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
 const VALORACION_SUGERIDA =
   'Las piezas se encuentran acorde a las especificaciones requeridas por cliente por lo que la conformidad de estas es "Aceptado".';
 
@@ -246,6 +313,7 @@ export default function ReporteDetalle() {
   const [plan, setPlan] = useState([]);
   const [agregando, setAgregando] = useState(false);
   const [editando, setEditando] = useState(null); // prueba en edición
+  const [editandoCabecera, setEditandoCabecera] = useState(false);
   const [aprobando, setAprobando] = useState(false);
   const [error, setError] = useState('');
   const [foto, setFoto] = useState(null);
@@ -365,6 +433,7 @@ export default function ReporteDetalle() {
               Precargar plan {norma || 'de cromado'} ({pruebas.length} pruebas)
             </button>
           ))}
+          {captura && !editandoCabecera && <button className="secundario" onClick={() => setEditandoCabecera(true)}>Editar datos</button>}
           {captura && !agregando && <button onClick={() => setAgregando(true)}>Agregar prueba</button>}
           {puedeAprobar && !aprobando && <button onClick={() => setAprobando(true)}>Aprobar y emitir</button>}
           {puedeFirmar && <button onClick={firmar}>Firmar</button>}
@@ -408,6 +477,15 @@ export default function ReporteDetalle() {
         </div>
       )}
 
+      {editandoCabecera && (
+        <FormCabecera
+          reporte={reporte}
+          onGuardada={() => { setEditandoCabecera(false); cargar(); }}
+          onCancelar={() => setEditandoCabecera(false)}
+        />
+      )}
+
+      {!editandoCabecera && (
       <div className="tarjeta">
         <div className="datos-grid">
           <div className="campo"><span className="etq">OF</span><span className="val">{reporte.of || '—'}</span></div>
@@ -424,6 +502,7 @@ export default function ReporteDetalle() {
           </span></div>
         </div>
       </div>
+      )}
 
       {agregando && (
         <FormPrueba
