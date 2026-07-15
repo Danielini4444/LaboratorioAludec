@@ -86,4 +86,30 @@ router.put('/:id', requireRol('admin_area'), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Borra un usuario (admin global o admin de área). Un usuario que ya capturó,
+// aprobó, firmó o subió evidencia NO se puede borrar: las llaves foráneas lo
+// impiden a propósito, porque romperían la trazabilidad de los documentos
+// (quién hizo qué). En ese caso se desactiva, que es lo correcto.
+router.delete('/:id(\\d+)', requireRol('admin_area'), async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (id === req.session.user.id) {
+      return res.status(400).json({ error: 'No puedes borrar tu propio usuario' });
+    }
+    const { rows } = await query(
+      'DELETE FROM usuarios WHERE id = $1 RETURNING id, usuario', [id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.code === '23503') {
+      return res.status(409).json({
+        error: 'Este usuario tiene documentos asociados (registros, reportes, solicitudes o fotos) ' +
+               'y no se puede borrar sin romper la trazabilidad. Desactívalo en su lugar.'
+      });
+    }
+    next(e);
+  }
+});
+
 module.exports = router;

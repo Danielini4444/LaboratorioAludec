@@ -7,6 +7,7 @@ import { val, cumple } from '../validaciones.js';
 const ROLES_DE_AREA = ['admin_area', 'usuario_area'];
 
 function Usuarios({ soloLectura }) {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [areas, setAreas] = useState([]);
   const [form, setForm] = useState({ usuario: '', nombre: '', password: '', rol: 'usuario_area', area_id: '' });
@@ -71,6 +72,16 @@ function Usuarios({ soloLectura }) {
     try {
       await api(`/usuarios/${u.id}`, { method: 'PUT', body: { password: nueva } });
       alert('Contraseña actualizada');
+    } catch (e) { alert(e.message); }
+  };
+
+  // Un usuario que ya capturó/aprobó/firmó algo no se puede borrar (la traza
+  // de los documentos lo impide); el servidor lo explica y se desactiva.
+  const borrar = async (u) => {
+    if (!confirm(`¿Borrar al usuario "${u.nombre}" (${u.usuario})?\n\nSe borra definitivamente. Si ya capturó, aprobó o firmó documentos no se podrá borrar — en ese caso desactívalo.`)) return;
+    try {
+      await api(`/usuarios/${u.id}`, { method: 'DELETE' });
+      cargar();
     } catch (e) { alert(e.message); }
   };
 
@@ -142,6 +153,9 @@ function Usuarios({ soloLectura }) {
                       {u.activo ? 'Desactivar' : 'Activar'}
                     </button>
                     <button className="chico secundario" onClick={() => resetPassword(u)}>Contraseña</button>
+                    {u.id !== user.id && (
+                      <button className="chico secundario peligro" onClick={() => borrar(u)}>Borrar</button>
+                    )}
                   </td>
                 )}
               </tr>
