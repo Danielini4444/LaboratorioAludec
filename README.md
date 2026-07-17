@@ -1,4 +1,4 @@
-# Sistema de Laboratorio — ALUDEC (alpha 0.14)
+# Sistema de Laboratorio — ALUDEC (alpha 0.2)
 
 Software interno del laboratorio de **ALUDEC Automoción** (cromado de emblemas). Hecho **a la medida de los formatos en papel del laboratorio** — sin plantillas ni módulos configurables: cada formato es su propia pantalla, su propia tabla y su propio PDF.
 
@@ -6,9 +6,10 @@ Módulos:
 
 1. **Registro de espesores y S.T.E.P.** (Químico) — formato FM-15-01-03.
 2. **Test de cromado** (Metrología, folios `Ens_####`) — formato FM-15-30.
-3. **Planes de prueba** (Metrología) — el plan de validación de cromado por cliente, que se precarga a los reportes.
-4. **Imprimir por OF** — junta en un solo PDF lo capturado bajo una orden de fabricación.
-5. **Administración** — usuarios, catálogo de piezas, normas por cliente, equipos y clientes, todo editable por fila.
+3. **Ensayos inyección** (Metrología, folios `Iny_####`) — informes de ensayos de piezas inyectadas.
+4. **Planes de prueba** (Metrología) — el plan de validación de cromado por cliente, que se precarga a los reportes.
+5. **Imprimir por OF** — junta en un solo PDF lo capturado bajo una orden de fabricación.
+6. **Administración** — usuarios, catálogo de piezas, normas por cliente, equipos y clientes, todo editable por fila.
 
 ---
 
@@ -31,20 +32,29 @@ Módulos:
 - El **admin de Metrología aprueba** con la conclusión CUMPLE / NO CUMPLE → queda emitido y ya no se modifica.
 - El **PDF FM-15-30 bilingüe** sale con las 8 secciones del procedimiento: datos generales, identificación de pieza, pruebas con su detalle y evidencia, y conclusión. Marca de agua BORRADOR si aún no está aprobado.
 
-## 3. Planes de prueba (Metrología)
+## 3. Ensayos inyección (Metrología) — alpha 0.2
+
+- El personal de **Metrología** crea el informe y se le asigna el **No. de ensayo** (`Iny_0001`, `Iny_0002`… consecutivo propio del módulo).
+- La cabecera lleva cliente, referencia/denominación (autocompletado del mismo catálogo de piezas), **OF/lote opcional y múltiple** (se agregan varias, o ninguna cuando no aplica), solicitante e información previa.
+- Los ensayos se capturan como filas: **Id, Ensayo-Descripción, Exigencia, Resultado, Característica, Observaciones y Conformidad (OK/NOK)**.
+- **Apartado de fotos** del informe: se suben las que se necesiten y **cada foto lleva su descripción** (editable hasta que el informe se apruebe).
+- El **admin de Metrología aprueba** con la **valoración final** (texto) → queda emitido e inmutable. Firma digital con QR y anulación con traza, igual que el resto de documentos.
+- El **PDF** sale con datos generales, la tabla de ensayos, la valoración final y las fotos con su descripción al pie (marca de agua BORRADOR/ANULADO cuando aplica). El código de formato controlado queda pendiente de que calidad emita el formato real (constante `FORMATO_CODIGO` en `server/src/pdf/ensayoInyeccionPdf.js`).
+
+## 4. Planes de prueba (Metrología)
 
 - Pantalla **Planes de prueba** (en el menú, solo Metrología/admin): el catálogo de planes de validación de cromado por cliente, que es lo que precargan los reportes.
 - **Crear un plan**: se elige cliente, se escribe la norma del plan y se agregan sus pruebas (ensayo, norma/apartado, característica a evaluar). Se pueden agregar o quitar filas.
 - Lista de **planes existentes** agrupados por cliente y norma, con su tabla de pruebas y opción de **borrar** (borrar un plan no afecta a los reportes ya creados).
 - Los 16 planes iniciales se importaron del Excel de metrología (hoja CROMADO VAL); desde aquí se crean los que falten (p. ej. clientes sin plan).
 
-## 4. Imprimir por OF
+## 5. Imprimir por OF
 
 - Cualquier usuario busca una **OF** y ve todo lo capturado con ella en los dos módulos.
 - Marca qué documentos imprimir — y dentro de cada test de cromado, **qué pruebas** — y sale **un solo PDF**: primero los informes FM-15-30, luego los registros FM-15-01-03 de anexo (como el paquete real Ens_2384).
 - Smoke test manual del armado: `node server/scripts/prueba-of.js`.
 
-## 5. Administración
+## 6. Administración
 
 - Pestañas **Usuarios, Piezas, Normas, Equipos y Clientes**. Solo el **admin global** edita; el auditor admin la ve en solo lectura.
 - Todo se edita **por fila** (botón *Editar* → Guardar/Cancelar): usuarios (nombre, rol y área; contraseña y activar/desactivar con sus propios botones), piezas (referencia, denominación y cliente), equipos (nombre, ID interno y fecha de calibración — se pueden vaciar), clientes (renombrar) y normas (límites por cliente).
@@ -58,7 +68,7 @@ Dentro de los formularios (registro de espesores y pruebas de cromado) hay una *
 
 ## Firma digital y QR de verificación
 
-Los documentos **aprobados** (registro de espesores y reporte de ensayo) se pueden **firmar digitalmente**. Firman **solo admin, admin de Químico y admin de Metrología**:
+Los documentos **aprobados** (registro de espesores, reporte de ensayo y ensayo de inyección) se pueden **firmar digitalmente**. Firman **solo admin, admin de Químico y admin de Metrología**:
 
 - La firma guarda **quién y cuándo**, más un **token HMAC-SHA256** del documento con el secreto del servidor (`FIRMA_SECRET` o `SESSION_SECRET` en `server/.env`): no se puede fabricar una firma válida sin el secreto.
 - El **PDF firmado** lleva el bloque *FIRMA DIGITAL / DIGITAL SIGNATURE*: firmante, fecha/hora, ID de firma y **código QR**. En el FM-15-01-03, el APPROVED BY deja de ir en blanco y lleva al firmante. La impresión por OF también incluye el QR de cada documento firmado.

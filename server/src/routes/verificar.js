@@ -53,29 +53,43 @@ function pagina({ valida, titulo, filas, motivo }) {
 </body></html>`;
 }
 
-router.get('/:tipo(registro|reporte)/:id(\\d+)/:token', async (req, res, next) => {
-  try {
-    const { tipo, id, token } = req.params;
-    const sql = tipo === 'registro'
-      ? `SELECT r.reporte_no::text AS folio_texto, r.referencia, r.denominacion, r.of,
+const CONSULTAS = {
+  registro: `SELECT r.reporte_no::text AS folio_texto, r.referencia, r.denominacion, r.of,
                 r.firma_token, r.firmado_en, r.anulado_por,
                 c.nombre AS cliente_nombre, uf.nombre AS firmado_por_nombre
          FROM registros_espesores r
          JOIN clientes c ON c.id = r.cliente_id
          LEFT JOIN usuarios uf ON uf.id = r.firmado_por
-         WHERE r.id = $1`
-      : `SELECT 'Ens_' || r.folio AS folio_texto, r.referencia, r.denominacion, r.of,
+         WHERE r.id = $1`,
+  reporte: `SELECT 'Ens_' || r.folio AS folio_texto, r.referencia, r.denominacion, r.of,
                 r.firma_token, r.firmado_en, r.anulado_por,
                 c.nombre AS cliente_nombre, uf.nombre AS firmado_por_nombre
          FROM reportes_ensayo r
          JOIN clientes c ON c.id = r.cliente_id
          LEFT JOIN usuarios uf ON uf.id = r.firmado_por
-         WHERE r.id = $1`;
-    const { rows } = await query(sql, [id]);
+         WHERE r.id = $1`,
+  inyeccion: `SELECT 'Iny_' || lpad(r.folio::text, 4, '0') AS folio_texto,
+                r.referencia, r.denominacion, NULLIF(array_to_string(r.ofs, ', '), '') AS of,
+                r.firma_token, r.firmado_en, r.anulado_por,
+                c.nombre AS cliente_nombre, uf.nombre AS firmado_por_nombre
+         FROM ensayos_inyeccion r
+         JOIN clientes c ON c.id = r.cliente_id
+         LEFT JOIN usuarios uf ON uf.id = r.firmado_por
+         WHERE r.id = $1`
+};
+
+const NOMBRES_DOC = {
+  registro: 'Registro de espesores y STEP (FM-15-01-03)',
+  reporte: 'Informe de ensayos (FM-15-30)',
+  inyeccion: 'Informe de ensayos de inyección'
+};
+
+router.get('/:tipo(registro|reporte|inyeccion)/:id(\\d+)/:token', async (req, res, next) => {
+  try {
+    const { tipo, id, token } = req.params;
+    const { rows } = await query(CONSULTAS[tipo], [id]);
     const doc = rows[0];
-    const nombreDoc = tipo === 'registro'
-      ? 'Registro de espesores y STEP (FM-15-01-03)'
-      : 'Informe de ensayos (FM-15-30)';
+    const nombreDoc = NOMBRES_DOC[tipo];
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
 

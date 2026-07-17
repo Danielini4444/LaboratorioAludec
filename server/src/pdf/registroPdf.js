@@ -226,15 +226,21 @@ module.exports = function generarRegistroPdf(stream, registro, opciones = {}) {
   const fotos = (registro.imagenes || []).filter(img => !img.pieza_id && existe(img));
   if (fotos.length) {
     tabla(doc, MARGEN, [{ titulo: 'SAMPLE', ancho: ANCHO_UTIL }], [], 12);
-    let x = MARGEN + 10;
-    const yFotos = doc.y;
-    for (const img of fotos.slice(0, 3)) {
+    // cada foto de muestra va al ancho completo de las tablas, con el alto
+    // proporcional (tope de 300 pt para que no se coma la página)
+    for (const img of fotos) {
       try {
-        doc.image(path.join(UPLOADS, img.archivo), x, yFotos, { fit: [155, 110] });
-        x += 165;
+        const info = doc.openImage(path.join(UPLOADS, img.archivo));
+        const escala = Math.min(ANCHO_UTIL / info.width, 300 / info.height);
+        const ancho = info.width * escala;
+        const alto = info.height * escala;
+        if (doc.y + alto + 8 > LIMITE_Y) doc.addPage();
+        doc.image(path.join(UPLOADS, img.archivo), MARGEN + (ANCHO_UTIL - ancho) / 2, doc.y + 3,
+          { width: ancho, height: alto });
+        doc.y += alto + 10;
       } catch { /* ilegible: se omite */ }
     }
-    doc.y = yFotos + 118;
+    doc.x = MARGEN;
   }
 
   doc.font('Helvetica-Bold').fontSize(10).text('Thickness measurement', MARGEN, doc.y, { width: ANCHO_UTIL, align: 'center' });

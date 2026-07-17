@@ -178,17 +178,24 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     // evidencia fotográfica
     const fotos = (p.imagenes || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
     if (fotos.length) {
+      salto(100); // que la etiqueta no quede huérfana al pie: viaja con sus fotos
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
       doc.fillColor('black');
+      // cada foto ocupa solo su espacio real (escalada a un máximo de 240×160):
+      // se acomodan en fila y la fila avanza según la más alta, sin huecos fijos
       let x = MARGEN;
       let filaAlto = 0;
       for (const img of fotos) {
-        if (x + 240 > MARGEN + ANCHO_UTIL) { x = MARGEN; doc.y += filaAlto + 8; filaAlto = 0; }
-        if (doc.y + 165 > LIMITE_Y) { doc.addPage(); x = MARGEN; filaAlto = 0; }
         try {
-          doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 4, { fit: [240, 160] });
-          x += 252;
-          filaAlto = Math.max(filaAlto, 168);
+          const info = doc.openImage(path.join(UPLOADS, img.archivo));
+          const escala = Math.min(240 / info.width, 160 / info.height);
+          const ancho = info.width * escala;
+          const alto = info.height * escala;
+          if (x + ancho > MARGEN + ANCHO_UTIL) { x = MARGEN; doc.y += filaAlto + 8; filaAlto = 0; }
+          if (doc.y + alto + 8 > LIMITE_Y) { doc.addPage(); x = MARGEN; filaAlto = 0; }
+          doc.image(path.join(UPLOADS, img.archivo), x, doc.y + 4, { width: ancho, height: alto });
+          x += ancho + 12;
+          filaAlto = Math.max(filaAlto, alto + 8);
         } catch { /* ilegible: se omite */ }
       }
       doc.y += filaAlto + 10;

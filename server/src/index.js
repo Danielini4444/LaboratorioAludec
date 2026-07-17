@@ -61,6 +61,7 @@ app.use('/api/imagenes', require('./routes/imagenes'));
 app.use('/api/especificaciones', require('./routes/especificaciones'));
 app.use('/api/of', require('./routes/of'));
 app.use('/api/solicitudes-ensayo', require('./routes/solicitudesEnsayo'));
+app.use('/api/ensayos-inyeccion', require('./routes/ensayosInyeccion'));
 
 app.use((err, req, res, next) => {
   if (err.status) return res.status(err.status).json({ error: err.message });

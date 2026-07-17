@@ -149,5 +149,72 @@ router.delete('/prueba-img/:id(\\d+)', requireArea('Metrología'), async (req, r
   } catch (e) { next(e); }
 });
 
+// ===== Fotos de los Ensayos de inyección (apartado general del informe) =====
+// Cada foto lleva su descripción: se sube sin ella y se captura/edita inline.
+
+router.post('/ensayo-iny/:ensayoId(\\d+)', requireArea('Metrología'), subir.array('imagenes'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id FROM ensayos_inyeccion
+       WHERE id = $1 AND aprobado_por IS NULL AND anulado_por IS NULL`, [req.params.ensayoId]
+    );
+    if (!rows[0]) {
+      for (const f of req.files || []) fs.unlink(f.path, () => {});
+      return res.status(404).json({ error: 'Ensayo no encontrado o el informe ya está cerrado (aprobado o anulado)' });
+    }
+    if (!req.files || !req.files.length) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+
+    const guardadas = [];
+    for (const f of req.files) {
+      const { rows: ins } = await query(
+        `INSERT INTO ensayo_iny_fotos (ensayo_id, archivo, nombre_original, subida_por, sha256)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id, nombre_original`,
+        [req.params.ensayoId, f.filename, f.originalname, req.session.user.id, hashArchivo(f.filename)]
+      );
+      guardadas.push(ins[0]);
+    }
+    res.status(201).json(guardadas);
+  } catch (e) { next(e); }
+});
+
+// Edita la descripción de una foto mientras el informe siga abierto.
+router.put('/ensayo-iny-img/:id(\\d+)', requireArea('Metrología'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE ensayo_iny_fotos i SET descripcion = $1
+       FROM ensayos_inyeccion e
+       WHERE i.id = $2 AND e.id = i.ensayo_id AND e.aprobado_por IS NULL AND e.anulado_por IS NULL
+       RETURNING i.id, i.descripcion`,
+      [(req.body.descripcion || '').trim() || null, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Foto no encontrada o el informe ya está cerrado (aprobado o anulado)' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.get('/ensayo-iny-img/:id(\\d+)/archivo', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query('SELECT archivo FROM ensayo_iny_fotos WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Imagen no encontrada' });
+    res.sendFile(path.join(UPLOADS, rows[0].archivo), err => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Archivo no disponible' });
+    });
+  } catch (e) { next(e); }
+});
+
+router.delete('/ensayo-iny-img/:id(\\d+)', requireArea('Metrología'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT i.archivo, e.aprobado_por, e.anulado_por FROM ensayo_iny_fotos i
+       JOIN ensayos_inyeccion e ON e.id = i.ensayo_id WHERE i.id = $1`, [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Imagen no encontrada' });
+    if (rows[0].aprobado_por || rows[0].anulado_por) return res.status(400).json({ error: 'El informe ya está cerrado (aprobado o anulado) y no admite cambios' });
+    await query('DELETE FROM ensayo_iny_fotos WHERE id = $1', [req.params.id]);
+    fs.unlink(path.join(UPLOADS, rows[0].archivo), () => {});
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
 module.exports.UPLOADS = UPLOADS;
