@@ -183,7 +183,13 @@ module.exports = function generarEnsayoInyeccionPdf(stream, ensayo, opciones = {
   // ===== Fotos con descripción =====
   const fotos = (ensayo.fotos || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
   if (fotos.length) {
-    salto(120); // que el encabezado del apartado no quede huérfano al pie
+    // que el encabezado del apartado no quede huérfano al pie: viaja con la primera foto
+    let altoPrimera = 160;
+    try {
+      const info0 = doc.openImage(path.join(UPLOADS, fotos[0].archivo));
+      altoPrimera = info0.height * Math.min(240 / info0.width, 160 / info0.height);
+    } catch { /* se estima con el máximo */ }
+    salto(altoPrimera + 46);
     doc.rect(MARGEN, doc.y, ANCHO_UTIL, 16).fillAndStroke(FONDO, BORDE);
     doc.fillColor('black').font('Helvetica-Bold').fontSize(8.5)
       .text('EVIDENCIA FOTOGRÁFICA / PHOTOGRAPHIC EVIDENCE', MARGEN + 6, doc.y + 4);

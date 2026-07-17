@@ -178,7 +178,13 @@ module.exports = function generarReportePdf(stream, reporte, opciones = {}) {
     // evidencia fotográfica
     const fotos = (p.imagenes || []).filter(img => fs.existsSync(path.join(UPLOADS, img.archivo)));
     if (fotos.length) {
-      salto(100); // que la etiqueta no quede huérfana al pie: viaja con sus fotos
+      // que la etiqueta no quede huérfana al pie: viaja con la primera foto
+      let altoPrimera = 160;
+      try {
+        const info0 = doc.openImage(path.join(UPLOADS, fotos[0].archivo));
+        altoPrimera = info0.height * Math.min(240 / info0.width, 160 / info0.height);
+      } catch { /* se estima con el máximo */ }
+      salto(altoPrimera + 26);
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS).text('Evidencia / Evidence:', MARGEN, doc.y);
       doc.fillColor('black');
       // cada foto ocupa solo su espacio real (escalada a un máximo de 240×160):
