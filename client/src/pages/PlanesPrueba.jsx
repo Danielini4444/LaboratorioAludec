@@ -10,6 +10,102 @@ import { val } from '../validaciones.js';
 
 const PRUEBA_VACIA = { norma: '', ensayo: '', caracteristica: '' };
 
+// Tabla editable de pruebas de un plan (la usan el alta y la edición).
+function EditorFilas({ pruebas, onCambio }) {
+  const setPrueba = (i, campo, valor) =>
+    onCambio(pruebas.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
+  const agregarFila = () => onCambio([...pruebas, { ...PRUEBA_VACIA }]);
+  const quitarFila = (i) => { if (pruebas.length > 1) onCambio(pruebas.filter((_, j) => j !== i)); };
+
+  return (
+    <>
+      <div className="tabla-scroll">
+        <table className="tabla mediciones">
+          <thead>
+            <tr>
+              <th style={{ width: 28 }}>#</th>
+              <th>Ensayo realizado</th>
+              <th>Norma / apartado</th>
+              <th>Característica a evaluar</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pruebas.map((p, i) => (
+              <tr key={i}>
+                <td>{i + 1}</td>
+                <td>
+                  <input style={{ width: '100%' }} value={p.ensayo} onChange={e => setPrueba(i, 'ensayo', e.target.value)}
+                    {...val('nombreCatalogo')} placeholder="ej. Stone Chip, Corrosión CASS" />
+                </td>
+                <td>
+                  <input style={{ width: '100%' }} value={p.norma} onChange={e => setPrueba(i, 'norma', e.target.value)}
+                    {...val('norma')} placeholder="(igual a la del plan)" />
+                </td>
+                <td>
+                  <input style={{ width: '100%' }} value={p.caracteristica} onChange={e => setPrueba(i, 'caracteristica', e.target.value)}
+                    placeholder="criterio de aceptación" />
+                </td>
+                <td>
+                  <button type="button" className="btn-quitar-fila" title="Quitar"
+                    onClick={() => quitarFila(i)}>×</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="acciones">
+        <button type="button" className="secundario chico" onClick={agregarFila}>+ Agregar prueba</button>
+      </div>
+    </>
+  );
+}
+
+// Edición de un plan existente: misma tabla del alta, precargada; al guardar
+// se reemplaza el plan completo (permite renombrar la norma, agregar,
+// modificar y quitar pruebas).
+function EditorPlan({ grupo, onGuardado, onCancelar }) {
+  const [norma, setNorma] = useState(grupo.plan_norma || '');
+  const [pruebas, setPruebas] = useState(grupo.pruebas.map(p => ({
+    norma: p.norma || '', ensayo: p.ensayo || '', caracteristica: p.caracteristica || ''
+  })));
+  const [error, setError] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    setError('');
+    setGuardando(true);
+    try {
+      const r = await api(`/planes/${grupo.cliente_id}?plan_norma=${encodeURIComponent(grupo.plan_norma)}`, {
+        method: 'PUT',
+        body: { plan_norma: norma, pruebas }
+      });
+      onGuardado(r);
+    } catch (e) {
+      setError(e.message);
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <form className="formulario" onSubmit={guardar}>
+      <div className="fila" style={{ marginTop: 10 }}>
+        <label>Norma del plan
+          <input value={norma} onChange={e => setNorma(e.target.value)} required {...val('norma')} />
+        </label>
+      </div>
+      <EditorFilas pruebas={pruebas} onCambio={setPruebas} />
+      {error && <div className="error">{error}</div>}
+      <div className="acciones" style={{ marginTop: 10 }}>
+        <button type="submit" disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar cambios'}</button>
+        <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
 export default function PlanesPrueba() {
   const { user } = useAuth();
   const [params] = useSearchParams();
@@ -18,6 +114,7 @@ export default function PlanesPrueba() {
   const [planes, setPlanes] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [error, setError] = useState('');
+  const [editando, setEditando] = useState(null); // clave cliente|norma del plan en edición
   const [confirmar, dialogoConfirmar] = useConfirmar();
   const [avisar, vistaAviso] = useAviso();
 
@@ -41,11 +138,6 @@ export default function PlanesPrueba() {
     }
     return [...m.values()];
   }, [planes]);
-
-  const setPrueba = (i, campo, valor) =>
-    setPruebas(ps => ps.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
-  const agregarFila = () => setPruebas(ps => [...ps, { ...PRUEBA_VACIA }]);
-  const quitarFila = (i) => setPruebas(ps => (ps.length > 1 ? ps.filter((_, j) => j !== i) : ps));
 
   const guardar = async (e) => {
     e.preventDefault();
@@ -109,45 +201,7 @@ export default function PlanesPrueba() {
           </div>
 
           <h4 className="sub-seccion">Pruebas del plan</h4>
-          <div className="tabla-scroll">
-            <table className="tabla mediciones">
-              <thead>
-                <tr>
-                  <th style={{ width: 28 }}>#</th>
-                  <th>Ensayo realizado</th>
-                  <th>Norma / apartado</th>
-                  <th>Característica a evaluar</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pruebas.map((p, i) => (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td>
-                      <input style={{ width: '100%' }} value={p.ensayo} onChange={e => setPrueba(i, 'ensayo', e.target.value)}
-                        {...val('nombreCatalogo')} placeholder="ej. Stone Chip, Corrosión CASS" />
-                    </td>
-                    <td>
-                      <input style={{ width: '100%' }} value={p.norma} onChange={e => setPrueba(i, 'norma', e.target.value)}
-                        {...val('norma')} placeholder="(igual a la del plan)" />
-                    </td>
-                    <td>
-                      <input style={{ width: '100%' }} value={p.caracteristica} onChange={e => setPrueba(i, 'caracteristica', e.target.value)}
-                        placeholder="criterio de aceptación" />
-                    </td>
-                    <td>
-                      <button type="button" className="btn-quitar-fila" title="Quitar"
-                        onClick={() => quitarFila(i)}>×</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="acciones">
-            <button type="button" className="secundario chico" onClick={agregarFila}>+ Agregar prueba</button>
-          </div>
+          <EditorFilas pruebas={pruebas} onCambio={setPruebas} />
 
           <div className="barra-guardar">
             <button type="submit" disabled={guardando}>{guardando ? 'Guardando…' : 'Crear plan'}</button>
@@ -157,35 +211,52 @@ export default function PlanesPrueba() {
 
       <h3>Planes existentes <span className="conteo">({grupos.length})</span></h3>
       {!grupos.length && <div className="vacio">Todavía no hay planes cargados.</div>}
-      {grupos.map(g => (
-        <div className="tarjeta" key={`${g.cliente_id}|${g.plan_norma}`}>
-          <div className="ensayo-titulo">
-            <strong>{g.cliente_nombre}</strong>
-            <span className="badge">{g.plan_norma || 'sin norma'}</span>
-            <span className="meta">{g.pruebas.length} pruebas</span>
-            {puedeEditar && (
-              <span className="acciones">
-                <button className="chico secundario peligro" onClick={() => borrar(g)}>Borrar</button>
-              </span>
+      {grupos.map(g => {
+        const clave = `${g.cliente_id}|${g.plan_norma}`;
+        const enEdicion = editando === clave;
+        return (
+          <div className="tarjeta" key={clave}>
+            <div className="ensayo-titulo">
+              <strong>{g.cliente_nombre}</strong>
+              <span className="badge">{g.plan_norma || 'sin norma'}</span>
+              <span className="meta">{g.pruebas.length} pruebas</span>
+              {puedeEditar && !enEdicion && (
+                <span className="acciones">
+                  <button className="chico" onClick={() => setEditando(clave)}>Editar</button>
+                  <button className="chico secundario peligro" onClick={() => borrar(g)}>Borrar</button>
+                </span>
+              )}
+            </div>
+            {enEdicion ? (
+              <EditorPlan
+                grupo={g}
+                onGuardado={(r) => {
+                  setEditando(null);
+                  avisar(`Plan "${r.plan_norma}" actualizado (${r.pruebas} pruebas)`, 'ok');
+                  cargar();
+                }}
+                onCancelar={() => setEditando(null)}
+              />
+            ) : (
+              <table className="tabla mediciones" style={{ marginTop: 10 }}>
+                <thead>
+                  <tr><th>#</th><th>Ensayo</th><th>Norma</th><th>Característica</th></tr>
+                </thead>
+                <tbody>
+                  {g.pruebas.map(p => (
+                    <tr key={p.id}>
+                      <td>{p.orden}</td>
+                      <td>{p.ensayo}</td>
+                      <td>{p.norma || '—'}</td>
+                      <td>{p.caracteristica || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
-          <table className="tabla mediciones" style={{ marginTop: 10 }}>
-            <thead>
-              <tr><th>#</th><th>Ensayo</th><th>Norma</th><th>Característica</th></tr>
-            </thead>
-            <tbody>
-              {g.pruebas.map(p => (
-                <tr key={p.id}>
-                  <td>{p.orden}</td>
-                  <td>{p.ensayo}</td>
-                  <td>{p.norma || '—'}</td>
-                  <td>{p.caracteristica || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+        );
+      })}
 
       {dialogoConfirmar}
       {vistaAviso}

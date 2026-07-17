@@ -72,6 +72,61 @@ router.post('/', requireArea(AREA), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Edita un plan completo (cliente + norma del plan): reemplaza sus pruebas
+// (y opcionalmente renombra la norma) en una sola transacción. La norma
+// actual va por query para no romper la ruta si contiene caracteres como "/".
+router.put('/:cliente_id(\\d+)', requireArea(AREA), async (req, res, next) => {
+  const planNorma = (req.query.plan_norma || '').trim();
+  if (!planNorma) return res.status(400).json({ error: 'Falta la norma del plan (plan_norma)' });
+  const normaNueva = (req.body.plan_norma || '').trim() || planNorma;
+  const limpias = (Array.isArray(req.body.pruebas) ? req.body.pruebas : [])
+    .map(p => ({
+      norma: (p.norma || '').trim() || normaNueva,
+      ensayo: (p.ensayo || '').trim(),
+      caracteristica: (p.caracteristica || '').trim() || null
+    }))
+    .filter(p => p.ensayo);
+  if (!limpias.length) return res.status(400).json({ error: 'El plan debe quedar con al menos una prueba' });
+
+  try {
+    const { rows: existe } = await query(
+      `SELECT 1 FROM planes_prueba WHERE proceso = $1 AND cliente_id = $2 AND plan_norma = $3 LIMIT 1`,
+      [PROCESO, req.params.cliente_id, planNorma]
+    );
+    if (!existe[0]) return res.status(404).json({ error: 'Plan no encontrado' });
+    if (normaNueva !== planNorma) {
+      const { rows: choque } = await query(
+        `SELECT 1 FROM planes_prueba WHERE proceso = $1 AND cliente_id = $2 AND plan_norma = $3 LIMIT 1`,
+        [PROCESO, req.params.cliente_id, normaNueva]
+      );
+      if (choque[0]) return res.status(409).json({ error: `El cliente ya tiene un plan "${normaNueva}"` });
+    }
+    const conexion = await pool.connect();
+    try {
+      await conexion.query('BEGIN');
+      await conexion.query(
+        `DELETE FROM planes_prueba WHERE proceso = $1 AND cliente_id = $2 AND plan_norma = $3`,
+        [PROCESO, req.params.cliente_id, planNorma]
+      );
+      for (let i = 0; i < limpias.length; i++) {
+        const p = limpias[i];
+        await conexion.query(
+          `INSERT INTO planes_prueba (proceso, cliente_id, plan_norma, norma, ensayo, caracteristica, orden)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [PROCESO, req.params.cliente_id, normaNueva, p.norma, p.ensayo, p.caracteristica, i + 1]
+        );
+      }
+      await conexion.query('COMMIT');
+    } catch (e) {
+      await conexion.query('ROLLBACK');
+      throw e;
+    } finally {
+      conexion.release();
+    }
+    res.json({ ok: true, plan_norma: normaNueva, pruebas: limpias.length });
+  } catch (e) { next(e); }
+});
+
 // Borra un plan completo (cliente + norma del plan). La norma va por query
 // para no romper la ruta si contiene caracteres como "/".
 router.delete('/:cliente_id(\\d+)', requireArea(AREA), async (req, res, next) => {
