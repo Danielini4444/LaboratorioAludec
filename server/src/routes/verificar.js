@@ -75,16 +75,25 @@ const CONSULTAS = {
          FROM ensayos_inyeccion r
          JOIN clientes c ON c.id = r.cliente_id
          LEFT JOIN usuarios uf ON uf.id = r.firmado_por
+         WHERE r.id = $1`,
+  pintura: `SELECT 'Pin_' || lpad(r.folio::text, 4, '0') AS folio_texto,
+                r.referencia, r.denominacion, NULLIF(array_to_string(r.ofs, ', '), '') AS of,
+                r.firma_token, r.firmado_en, r.anulado_por,
+                c.nombre AS cliente_nombre, uf.nombre AS firmado_por_nombre
+         FROM ensayos_pintura r
+         JOIN clientes c ON c.id = r.cliente_id
+         LEFT JOIN usuarios uf ON uf.id = r.firmado_por
          WHERE r.id = $1`
 };
 
 const NOMBRES_DOC = {
   registro: 'Registro de espesores y STEP (FM-15-01-03)',
   reporte: 'Informe de ensayos (FM-15-30)',
-  inyeccion: 'Informe de ensayos de inyección'
+  inyeccion: 'Informe de ensayos de inyección',
+  pintura: 'Informe de ensayos de pintura'
 };
 
-router.get('/:tipo(registro|reporte|inyeccion)/:id(\\d+)/:token', async (req, res, next) => {
+router.get('/:tipo(registro|reporte|inyeccion|pintura)/:id(\\d+)/:token', async (req, res, next) => {
   try {
     const { tipo, id, token } = req.params;
     const { rows } = await query(CONSULTAS[tipo], [id]);

@@ -216,5 +216,128 @@ router.delete('/ensayo-iny-img/:id(\\d+)', requireArea('Metrología'), async (re
   } catch (e) { next(e); }
 });
 
+// ===== Fotos de los Ensayos de pintura (apartado general del informe) =====
+// Igual que inyección: cada foto lleva su descripción, capturada/editada inline.
+
+router.post('/ensayo-pin/:ensayoId(\\d+)', requireArea('Metrología'), subir.array('imagenes'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id FROM ensayos_pintura
+       WHERE id = $1 AND aprobado_por IS NULL AND anulado_por IS NULL`, [req.params.ensayoId]
+    );
+    if (!rows[0]) {
+      for (const f of req.files || []) fs.unlink(f.path, () => {});
+      return res.status(404).json({ error: 'Ensayo no encontrado o el informe ya está cerrado (aprobado o anulado)' });
+    }
+    if (!req.files || !req.files.length) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+
+    const guardadas = [];
+    for (const f of req.files) {
+      const { rows: ins } = await query(
+        `INSERT INTO ensayo_pin_fotos (ensayo_id, archivo, nombre_original, subida_por, sha256)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id, nombre_original`,
+        [req.params.ensayoId, f.filename, f.originalname, req.session.user.id, hashArchivo(f.filename)]
+      );
+      guardadas.push(ins[0]);
+    }
+    res.status(201).json(guardadas);
+  } catch (e) { next(e); }
+});
+
+router.put('/ensayo-pin-img/:id(\\d+)', requireArea('Metrología'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE ensayo_pin_fotos i SET descripcion = $1
+       FROM ensayos_pintura e
+       WHERE i.id = $2 AND e.id = i.ensayo_id AND e.aprobado_por IS NULL AND e.anulado_por IS NULL
+       RETURNING i.id, i.descripcion`,
+      [(req.body.descripcion || '').trim() || null, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Foto no encontrada o el informe ya está cerrado (aprobado o anulado)' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.get('/ensayo-pin-img/:id(\\d+)/archivo', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query('SELECT archivo FROM ensayo_pin_fotos WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Imagen no encontrada' });
+    res.sendFile(path.join(UPLOADS, rows[0].archivo), err => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Archivo no disponible' });
+    });
+  } catch (e) { next(e); }
+});
+
+router.delete('/ensayo-pin-img/:id(\\d+)', requireArea('Metrología'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT i.archivo, e.aprobado_por, e.anulado_por FROM ensayo_pin_fotos i
+       JOIN ensayos_pintura e ON e.id = i.ensayo_id WHERE i.id = $1`, [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Imagen no encontrada' });
+    if (rows[0].aprobado_por || rows[0].anulado_por) return res.status(400).json({ error: 'El informe ya está cerrado (aprobado o anulado) y no admite cambios' });
+    await query('DELETE FROM ensayo_pin_fotos WHERE id = $1', [req.params.id]);
+    fs.unlink(path.join(UPLOADS, rows[0].archivo), () => {});
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// ===== Imagen ÚNICA por pieza del apartado de espesores (pintura) =====
+// Cada pieza tiene a lo sumo una imagen: al subir otra se reemplaza la anterior.
+
+router.post('/ensayo-pin-pieza/:piezaId(\\d+)', requireArea('Metrología'), subir.single('imagen'), async (req, res, next) => {
+  const limpiar = () => { if (req.file) fs.unlink(req.file.path, () => {}); };
+  try {
+    const { rows } = await query(
+      `SELECT p.id, p.imagen_archivo FROM ensayo_pin_piezas p
+       JOIN ensayos_pintura e ON e.id = p.ensayo_id
+       WHERE p.id = $1 AND e.aprobado_por IS NULL AND e.anulado_por IS NULL`, [req.params.piezaId]
+    );
+    if (!rows[0]) {
+      limpiar();
+      return res.status(404).json({ error: 'Pieza no encontrada o el informe ya está cerrado (aprobado o anulado)' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+
+    const anterior = rows[0].imagen_archivo;
+    await query(
+      `UPDATE ensayo_pin_piezas
+       SET imagen_archivo = $1, imagen_nombre = $2, imagen_sha256 = $3, imagen_subida_por = $4
+       WHERE id = $5`,
+      [req.file.filename, req.file.originalname, hashArchivo(req.file.filename), req.session.user.id, req.params.piezaId]
+    );
+    if (anterior) fs.unlink(path.join(UPLOADS, anterior), () => {});
+    res.status(201).json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+router.get('/ensayo-pin-pieza/:piezaId(\\d+)/archivo', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query('SELECT imagen_archivo FROM ensayo_pin_piezas WHERE id = $1', [req.params.piezaId]);
+    if (!rows[0] || !rows[0].imagen_archivo) return res.status(404).json({ error: 'Imagen no encontrada' });
+    res.sendFile(path.join(UPLOADS, rows[0].imagen_archivo), err => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Archivo no disponible' });
+    });
+  } catch (e) { next(e); }
+});
+
+router.delete('/ensayo-pin-pieza/:piezaId(\\d+)/imagen', requireArea('Metrología'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.imagen_archivo, e.aprobado_por, e.anulado_por FROM ensayo_pin_piezas p
+       JOIN ensayos_pintura e ON e.id = p.ensayo_id WHERE p.id = $1`, [req.params.piezaId]
+    );
+    if (!rows[0] || !rows[0].imagen_archivo) return res.status(404).json({ error: 'Imagen no encontrada' });
+    if (rows[0].aprobado_por || rows[0].anulado_por) return res.status(400).json({ error: 'El informe ya está cerrado (aprobado o anulado) y no admite cambios' });
+    await query(
+      `UPDATE ensayo_pin_piezas
+       SET imagen_archivo = NULL, imagen_nombre = NULL, imagen_sha256 = NULL, imagen_subida_por = NULL
+       WHERE id = $1`, [req.params.piezaId]
+    );
+    fs.unlink(path.join(UPLOADS, rows[0].imagen_archivo), () => {});
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
 module.exports.UPLOADS = UPLOADS;
