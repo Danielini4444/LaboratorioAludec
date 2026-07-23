@@ -283,14 +283,13 @@ export default function ReporteDetalle() {
   const anulado = !!reporte.anulado_por;
   const captura = !aprobado && !anulado && esMetrologia(user);
   const puedeAprobar = !aprobado && !anulado && reporte.pruebas.length > 0 &&
-    (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Metrología'));
+    (user.rol === 'admin' || user.rol === 'admin_area');
   // Firma digital: SOLO admin, admin de Químico y admin de Metrología,
   // sobre reportes ya aprobados y no anulados.
   const puedeFirmar = aprobado && !anulado && !reporte.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
-  // Anular y Borrar: admin global o admin de Metrología (área de este módulo).
-  const puedeGestionar = user.rol === 'admin' ||
-    (user.rol === 'admin_area' && user.area_nombre === 'Metrología');
+  // Anular y Borrar: admin global o cualquier admin de área.
+  const puedeGestionar = user.rol === 'admin' || user.rol === 'admin_area';
 
   const firmar = async () => {
     if (!await confirmar({

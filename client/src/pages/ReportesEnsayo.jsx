@@ -8,8 +8,8 @@ import AvisoQuimicoTerminados from '../components/AvisoQuimicoTerminados.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 export function esMetrologia(user) {
-  return user.rol === 'admin' ||
-    ((user.rol === 'admin_area' || user.rol === 'usuario_area') && user.area_nombre === 'Metrología');
+  return user.rol === 'admin' || user.rol === 'admin_area' ||
+    (user.rol === 'usuario_area' && user.area_nombre === 'Metrología');
 }
 
 const IconoVacio = () => (

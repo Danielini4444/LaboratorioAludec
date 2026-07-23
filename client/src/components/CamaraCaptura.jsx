@@ -1,42 +1,80 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Modal que abre la cámara del dispositivo (webcam de la laptop o cámara del
 // móvil) usando getUserMedia, muestra la vista en vivo y captura una foto JPG.
 //   onCaptura(file) -> se llama con el archivo de la foto tomada.
 //   onCerrar()      -> cerrar/cancelar sin capturar.
-// Requiere HTTPS (o localhost); si no, el navegador bloquea la cámara.
+// Requiere contexto seguro (HTTPS o localhost); por http://IP el navegador la
+// bloquea.
+
+// Mensaje según el nombre del error de getUserMedia, para que el motivo real
+// sea claro (permiso, cámara ocupada, sin cámara, etc.).
+const MENSAJES = {
+  NotAllowedError: 'Permiso de cámara bloqueado. Ábrelo desde el candado de la barra de direcciones y reintenta.',
+  NotFoundError: 'No se encontró ninguna cámara conectada al equipo.',
+  NotReadableError: 'La cámara está siendo usada por otra app o pestaña (Teams, Zoom, Meet, otra pestaña). Ciérrala y reintenta.',
+  OverconstrainedError: 'La cámara no admite la configuración solicitada.',
+  AbortError: 'El sistema no pudo iniciar la cámara. Reintenta.',
+  SecurityError: 'El navegador bloqueó la cámara por seguridad.',
+};
+
 export default function CamaraCaptura({ onCaptura, onCerrar }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const tokenRef = useRef(0);
   const [error, setError] = useState('');
   const [listo, setListo] = useState(false);
 
-  useEffect(() => {
-    let cancelado = false;
-    (async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error('sin soporte');
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }, audio: false,
-        });
-        if (cancelado) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
-        setListo(true);
-      } catch {
-        setError('No se pudo acceder a la cámara. Revisa los permisos del navegador y que la página use HTTPS.');
-      }
-    })();
-    return () => {
-      cancelado = true;
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    };
+  const detener = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
   }, []);
+
+  const abrir = useCallback(async () => {
+    const miToken = ++tokenRef.current; // invalida intentos anteriores
+    detener();
+    setError('');
+    setListo(false);
+
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setError('La cámara necesita HTTPS o localhost. Parece que entraste por una dirección no segura (http://IP), por eso el navegador la bloquea.');
+      return;
+    }
+
+    // Intenta la cámara trasera; si no existe (típico en laptop) usa cualquiera.
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch (e1) {
+      if (e1?.name === 'OverconstrainedError' || e1?.name === 'NotFoundError') {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch (e2) {
+          if (miToken === tokenRef.current) setError(MENSAJES[e2?.name] || `No se pudo acceder a la cámara (${e2?.name || 'error'}).`);
+          return;
+        }
+      } else {
+        if (miToken === tokenRef.current) setError(MENSAJES[e1?.name] || `No se pudo acceder a la cámara (${e1?.name || 'error'}).`);
+        return;
+      }
+    }
+
+    // Otro intento (o el cierre) tomó el relevo: suelta este stream.
+    if (miToken !== tokenRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play().catch(() => {});
+    }
+    setListo(true);
+  }, [detener]);
+
+  useEffect(() => {
+    abrir();
+    return () => { tokenRef.current++; detener(); };
+  }, [abrir, detener]);
 
   const capturar = () => {
     const video = videoRef.current;
@@ -48,24 +86,25 @@ export default function CamaraCaptura({ onCaptura, onCerrar }) {
     canvas.toBlob(blob => {
       if (!blob) return;
       const file = new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      detener();
       onCaptura(file);
       onCerrar();
     }, 'image/jpeg', 0.92);
   };
 
+  const cerrar = () => { detener(); onCerrar(); };
+
   return (
-    <div className="modal-fondo" onClick={onCerrar}>
+    <div className="modal-fondo" onClick={cerrar}>
       <div className="modal-camara" onClick={e => e.stopPropagation()}>
         {error
           ? <p className="error">{error}</p>
           : <video ref={videoRef} playsInline muted />}
         <div className="acciones-camara">
-          {!error && (
-            <button type="button" disabled={!listo} onClick={capturar}>
-              📷 Capturar
-            </button>
-          )}
-          <button type="button" className="secundario" onClick={onCerrar}>
+          {error
+            ? <button type="button" onClick={abrir}>Reintentar</button>
+            : <button type="button" disabled={!listo} onClick={capturar}>📷 Capturar</button>}
+          <button type="button" className="secundario" onClick={cerrar}>
             {error ? 'Cerrar' : 'Cancelar'}
           </button>
         </div>

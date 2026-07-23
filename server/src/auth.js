@@ -18,10 +18,12 @@ function requireRol(...roles) {
 // Personal de un área concreta (o admin global). Las dos áreas del
 // laboratorio: 'Químico' (registro de espesores) y 'Metrología'
 // (reportes de ensayos).
+// El admin de área entra a CUALQUIER área (no solo la suya); el usuario de
+// área queda limitado a su propia área.
 function esDeArea(user, area, soloAdmin = false) {
   if (user.rol === 'admin') return true;
-  const rolesValidos = soloAdmin ? ['admin_area'] : ['admin_area', 'usuario_area'];
-  return rolesValidos.includes(user.rol) && user.area_nombre === area;
+  if (user.rol === 'admin_area') return true;
+  return !soloAdmin && user.rol === 'usuario_area' && user.area_nombre === area;
 }
 
 function requireArea(area, soloAdmin = false) {

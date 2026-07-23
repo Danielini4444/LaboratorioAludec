@@ -102,14 +102,13 @@ export default function RegistroDetalle() {
     registro.imagenes.filter(img => img.pieza_id === piezaId && img.seccion === seccion);
   const fotosMuestra = registro.imagenes.filter(img => !img.pieza_id);
   const puedeAprobar = !registro.aprobado_por && !registro.anulado_por &&
-    (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Químico'));
+    (user.rol === 'admin' || user.rol === 'admin_area');
   // Firma digital: SOLO admin, admin de Químico y admin de Metrología,
   // sobre registros ya aprobados y no anulados.
   const puedeFirmar = registro.aprobado_por && !registro.anulado_por && !registro.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
-  // Anular y Borrar: admin global o admin de Químico (área de este módulo).
-  const puedeGestionar = user.rol === 'admin' ||
-    (user.rol === 'admin_area' && user.area_nombre === 'Químico');
+  // Anular y Borrar: admin global o cualquier admin de área.
+  const puedeGestionar = user.rol === 'admin' || user.rol === 'admin_area';
 
   const aprobar = async () => {
     try {

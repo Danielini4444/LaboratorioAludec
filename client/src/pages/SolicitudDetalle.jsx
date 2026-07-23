@@ -9,10 +9,11 @@ import Cargando from '../components/Cargando.jsx';
 
 const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : '—');
 
-// ¿El usuario pertenece al área que atiende esta solicitud?
+// ¿El usuario puede atender esta solicitud? El admin de área atiende cualquier
+// área; el usuario de área solo la suya.
 function atiendeArea(user, areaNombre) {
-  return user.rol === 'admin' ||
-    ((user.rol === 'admin_area' || user.rol === 'usuario_area') && user.area_nombre === areaNombre);
+  return user.rol === 'admin' || user.rol === 'admin_area' ||
+    (user.rol === 'usuario_area' && user.area_nombre === areaNombre);
 }
 
 function Campo({ etiqueta, valor }) {
@@ -85,9 +86,8 @@ export default function SolicitudDetalle() {
   const abierta = s.estado === 'pendiente' || s.estado === 'en_proceso';
   const puedeAtender = atiendeArea(user, s.area_nombre) && abierta;
   const puedeCancelar = puedeSolicitar(user) && abierta;
-  // Borrado definitivo: admin global o admin del área que atiende (cualquier estado).
-  const puedeBorrar = user.rol === 'admin' ||
-    (user.rol === 'admin_area' && user.area_nombre === s.area_nombre);
+  // Borrado definitivo: admin global o cualquier admin de área (cualquier estado).
+  const puedeBorrar = user.rol === 'admin' || user.rol === 'admin_area';
   const modulo = moduloPorKey(s.modulo);
   // Reporte pendiente: la solicitud ya fue tomada (en proceso) y la atiende su área.
   const puedeGenerarReporte = s.estado === 'en_proceso' && modulo && atiendeArea(user, s.area_nombre);

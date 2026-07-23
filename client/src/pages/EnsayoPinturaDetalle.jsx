@@ -431,12 +431,11 @@ export default function EnsayoPinturaDetalle() {
   const anulado = !!ensayo.anulado_por;
   const captura = !aprobado && !anulado && esMetrologia(user);
   const puedeAprobar = !aprobado && !anulado && ensayo.filas.length > 0 &&
-    (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Metrología'));
+    (user.rol === 'admin' || user.rol === 'admin_area');
   const puedeFirmar = aprobado && !anulado && !ensayo.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
-  // Anular y Borrar: admin global o admin de Metrología (área de este módulo).
-  const puedeGestionar = user.rol === 'admin' ||
-    (user.rol === 'admin_area' && user.area_nombre === 'Metrología');
+  // Anular y Borrar: admin global o cualquier admin de área.
+  const puedeGestionar = user.rol === 'admin' || user.rol === 'admin_area';
 
   // Elige (o quita) la especificación de espesores de pintura del informe.
   const cambiarEspec = async (espId) => {
