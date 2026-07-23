@@ -22,8 +22,13 @@ export default function CamaraCaptura({ onCaptura, onCerrar }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const tokenRef = useRef(0);
+  const archivoRef = useRef(null);
   const [error, setError] = useState('');
   const [listo, setListo] = useState(false);
+  // http://IP no es contexto seguro: la cámara EN VIVO (getUserMedia) queda
+  // bloqueada por el navegador, pero la cámara NATIVA del dispositivo vía
+  // selector de archivos sí funciona. En ese caso caemos a esa opción.
+  const [nativa, setNativa] = useState(false);
 
   const detener = useCallback(() => {
     if (streamRef.current) {
@@ -39,7 +44,8 @@ export default function CamaraCaptura({ onCaptura, onCerrar }) {
     setListo(false);
 
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      setError('La cámara necesita HTTPS o localhost. Parece que entraste por una dirección no segura (http://IP), por eso el navegador la bloquea.');
+      // Sin contexto seguro no hay cámara en vivo: ofrecemos la nativa.
+      setNativa(true);
       return;
     }
 
@@ -93,6 +99,34 @@ export default function CamaraCaptura({ onCaptura, onCerrar }) {
   };
 
   const cerrar = () => { detener(); onCerrar(); };
+
+  // Cámara nativa del dispositivo (funciona sobre http://IP en celular/tablet).
+  const usarNativa = (e) => {
+    const archivo = e.target.files[0];
+    e.target.value = '';
+    if (archivo) onCaptura(archivo);
+    onCerrar();
+  };
+
+  if (nativa) {
+    return (
+      <div className="modal-fondo" onClick={cerrar}>
+        <div className="modal-camara" onClick={e => e.stopPropagation()}>
+          <p className="error">
+            Esta conexión (http) no permite la cámara en vivo. Usa la cámara del dispositivo:
+          </p>
+          <div className="acciones-camara">
+            <button type="button" onClick={() => archivoRef.current.click()}>📷 Abrir cámara</button>
+            <button type="button" className="secundario" onClick={cerrar}>Cancelar</button>
+          </div>
+          <input
+            ref={archivoRef} type="file" accept="image/jpeg,image/png" capture="environment"
+            hidden onChange={usarNativa}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-fondo" onClick={cerrar}>
