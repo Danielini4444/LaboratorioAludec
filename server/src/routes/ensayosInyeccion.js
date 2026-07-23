@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { query } = require('../db');
-const { requireAuth, requireRol, requireArea, requireFirmante } = require('../auth');
+const { requireAuth, requireArea, requireFirmante } = require('../auth');
 const { generarToken, qrDeFirma } = require('../firma');
 const generarEnsayoInyeccionPdf = require('../pdf/ensayoInyeccionPdf');
 
@@ -232,7 +232,8 @@ router.put('/:id(\\d+)/firmar', requireFirmante, async (req, res, next) => {
 });
 
 // Anulación con traza (en vez de borrado): el informe queda visible y marcado.
-router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
+// Admin global o admin de Metrología.
+router.put('/:id(\\d+)/anular', requireArea(AREA, true), async (req, res, next) => {
   try {
     const motivo = (req.body.motivo || '').trim();
     if (!motivo) return res.status(400).json({ error: 'El motivo de la anulación es obligatorio' });
@@ -246,9 +247,10 @@ router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Borrado DEFINITIVO del informe completo: solo admin, aplica aunque esté
-// aprobado o firmado. Filas y fotos caen en cascada; las fotos se limpian del disco.
-router.delete('/:id(\\d+)', requireRol(), async (req, res, next) => {
+// Borrado DEFINITIVO del informe completo: admin global o admin de Metrología,
+// aplica aunque esté aprobado o firmado. Filas y fotos caen en cascada; las
+// fotos se limpian del disco.
+router.delete('/:id(\\d+)', requireArea(AREA, true), async (req, res, next) => {
   try {
     const { rows: fotos } = await query(
       'SELECT archivo FROM ensayo_iny_fotos WHERE ensayo_id = $1', [req.params.id]

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { val } from '../validaciones.js';
 
@@ -9,8 +9,16 @@ const FORM_VACIO = {
 
 export default function NuevoEnsayoInyeccion() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ ...FORM_VACIO });
-  const [ofs, setOfs] = useState([]);          // OF/lote: varias o ninguna
+  // Precarga desde una solicitud de ensayos (botón "Generar reporte").
+  const [sp] = useSearchParams();
+  const [form, setForm] = useState(() => ({
+    ...FORM_VACIO,
+    cliente_id: sp.get('cliente_id') || '',
+    referencia: sp.get('referencia') || '',
+    denominacion: sp.get('denominacion') || '',
+    solicitante: sp.get('solicitante') || '',
+  }));
+  const [ofs, setOfs] = useState(() => (sp.get('of') ? [sp.get('of')] : []));  // OF/lote: varias o ninguna
   const [ofActual, setOfActual] = useState('');
   const [clientes, setClientes] = useState([]);
   const [piezas, setPiezas] = useState([]);

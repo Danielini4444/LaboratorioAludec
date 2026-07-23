@@ -37,11 +37,25 @@ function fechaHora(d) {
   });
 }
 
-// Promedio de los puntos de espesor no nulos (2 decimales); '—' si no hay.
-function promedio(valores) {
-  const nums = (valores || []).filter(v => v !== null && v !== undefined && Number.isFinite(Number(v))).map(Number);
-  if (!nums.length) return '—';
-  return (nums.reduce((s, n) => s + n, 0) / nums.length).toFixed(2);
+// Rango mín–máx de una capa del spec para el PDF ("18–25", "≥ 18", "≤ 25", "N/S").
+function textoRango(capa) {
+  if (!capa) return 'N/S';
+  const hasMin = capa.espesor_min !== null && capa.espesor_min !== undefined;
+  const hasMax = capa.espesor_max !== null && capa.espesor_max !== undefined;
+  if (hasMin && hasMax) return `${capa.espesor_min}–${capa.espesor_max}`;
+  if (hasMin) return `≥ ${capa.espesor_min}`;
+  if (hasMax) return `≤ ${capa.espesor_max}`;
+  return 'N/S';
+}
+
+// ¿El valor cae fuera del rango de la capa?
+function fueraDeRango(capa, valor) {
+  if (!capa || valor === null || valor === undefined) return false;
+  const n = Number(valor);
+  if (Number.isNaN(n)) return false;
+  if (capa.espesor_min !== null && capa.espesor_min !== undefined && n < Number(capa.espesor_min)) return true;
+  if (capa.espesor_max !== null && capa.espesor_max !== undefined && n > Number(capa.espesor_max)) return true;
+  return false;
 }
 
 // opciones.qr: PNG del QR de verificación cuando el informe está firmado.
@@ -184,6 +198,15 @@ module.exports = function generarEnsayoPinturaPdf(stream, ensayo, opciones = {})
     doc.fillColor('black');
     doc.y += 10;
 
+    // Norma/especificación usada para validar las capas.
+    const espec = ensayo.especificacion || null;
+    const capasSpec = espec && espec.capas ? espec.capas : [];
+    const capaPorNombre = new Map(capasSpec.map(c => [c.nombre, c]));
+    doc.font('Helvetica').fontSize(8).fillColor(GRIS)
+      .text(`Especificación / Spec: ${espec ? espec.norma : 'sin especificación / none'}`, MARGEN, doc.y);
+    doc.fillColor('black');
+    doc.y += 12;
+
     for (const pieza of piezas) {
       salto(30);
       // Subtítulo de la pieza
@@ -192,21 +215,23 @@ module.exports = function generarEnsayoPinturaPdf(stream, ensayo, opciones = {})
       doc.fillColor('black');
       doc.y += 4;
 
-      // Tabla de puntos + promedio
+      // Tabla por capa: Capa | Valor | Rango | Conf.
       const espesores = pieza.espesores || [];
       if (espesores.length) {
-        const cols = espesores.map((_, i) => ({ titulo: String(i + 1), ancho: 0 }));
-        cols.push({ titulo: 'PROM. / AVG (µm)', ancho: 0 });
-        // reparte el ancho: la última columna un poco más ancha
-        const nCols = cols.length;
-        const anchoBase = Math.floor(ANCHO_UTIL / nCols);
-        cols.forEach((c, i) => { c.ancho = i === nCols - 1 ? ANCHO_UTIL - anchoBase * (nCols - 1) : anchoBase; });
-        const fila = espesores.map(v => (v === null || v === undefined ? '—' : String(v)));
-        fila.push(promedio(espesores));
-        tabla(cols, [fila], 14);
+        tabla([
+          { titulo: 'CAPA / LAYER', ancho: 200 },
+          { titulo: 'VALOR / VALUE (µm)', ancho: 110 },
+          { titulo: 'RANGO / RANGE (µm)', ancho: 122 },
+          { titulo: 'CONF.', ancho: 80 }
+        ], espesores.map(e => {
+          const capa = capaPorNombre.get(e.capa) || null;
+          const tieneValor = e.valor !== null && e.valor !== undefined;
+          const conf = !tieneValor || !capa ? '—' : (fueraDeRango(capa, e.valor) ? 'NOK' : 'OK');
+          return [e.capa, tieneValor ? String(e.valor) : '—', textoRango(capa), conf];
+        }), 16);
       } else {
         doc.font('Helvetica-Oblique').fontSize(8).fillColor(GRIS)
-          .text('Sin puntos de espesor / No thickness points', MARGEN, doc.y);
+          .text('Sin espesores capturados / No thickness recorded', MARGEN, doc.y);
         doc.fillColor('black');
         doc.y += 12;
       }

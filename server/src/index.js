@@ -59,6 +59,7 @@ app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/planes', require('./routes/planes'));
 app.use('/api/imagenes', require('./routes/imagenes'));
 app.use('/api/especificaciones', require('./routes/especificaciones'));
+app.use('/api/especificaciones-pintura', require('./routes/especificacionesPintura'));
 app.use('/api/of', require('./routes/of'));
 app.use('/api/solicitudes-ensayo', require('./routes/solicitudesEnsayo'));
 app.use('/api/ensayos-inyeccion', require('./routes/ensayosInyeccion'));

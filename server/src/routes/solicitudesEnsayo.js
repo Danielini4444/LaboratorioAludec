@@ -8,6 +8,24 @@ const router = express.Router();
 
 const SECUENCIA_FOLIO = { SE: 'sol_se_folio_seq', SEMP: 'sol_semp_folio_seq' };
 
+// Módulos del sistema a los que puede apuntar una solicitud. El área que
+// atiende se deduce de aquí (el solicitante ya no elige área), y ofCampo dice
+// qué OF de la solicitud precarga el reporte de ese módulo.
+const MODULOS = {
+  registro:  { area: 'Químico',    ofCampo: 'of_cromado' },
+  cromado:   { area: 'Metrología', ofCampo: 'of_cromado' },
+  inyeccion: { area: 'Metrología', ofCampo: 'of_inyeccion' },
+  pintura:   { area: 'Metrología', ofCampo: 'of_pintura' },
+};
+
+// La OF que se precargará al generar el reporte: la del módulo, o la primera
+// OF que venga llena si esa está vacía.
+function ofDeModulo(sol) {
+  const campo = MODULOS[sol.modulo]?.ofCampo;
+  const preferida = campo ? sol[campo] : null;
+  return preferida || sol.of_cromado || sol.of_inyeccion || sol.of_ensamble || sol.of_pintura || null;
+}
+
 // Carga cabecera + líneas de ensayo, con los nombres ya resueltos.
 async function cargarSolicitud(id) {
   const { rows } = await query(
@@ -47,7 +65,7 @@ router.get('/', requireAuth, async (req, res, next) => {
     }
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const { rows } = await query(
-      `SELECT s.id, s.tipo, s.folio, s.estado, s.referencia, s.denominacion, s.proveedor,
+      `SELECT s.id, s.tipo, s.folio, s.estado, s.modulo, s.referencia, s.denominacion, s.proveedor,
               s.creada_en, c.nombre AS cliente_nombre, a.nombre AS area_nombre,
               us.nombre AS solicitada_por_nombre,
               (SELECT count(*) FROM solicitud_ensayo_lineas l WHERE l.solicitud_id = s.id)::int AS num_ensayos
@@ -58,6 +76,48 @@ router.get('/', requireAuth, async (req, res, next) => {
        ${where} ORDER BY s.creada_en DESC LIMIT 300`, params
     );
     res.json(rows);
+  } catch (e) { next(e); }
+});
+
+// Solicitudes YA TOMADAS (en_proceso) de un módulo, pendientes de generar su
+// reporte. Alimenta el aviso "Tienes un reporte pendiente de esta OF" en la
+// lista del módulo; trae los datos de cliente/pieza/OF para precargar.
+router.get('/pendientes', requireAuth, async (req, res, next) => {
+  try {
+    const modulo = req.query.modulo;
+    if (!MODULOS[modulo]) return res.status(400).json({ error: 'Módulo inválido' });
+    const { rows } = await query(
+      `SELECT s.id, s.tipo, s.folio, s.cliente_id, s.referencia, s.denominacion,
+              s.of_cromado, s.of_inyeccion, s.of_ensamble, s.of_pintura,
+              c.nombre AS cliente_nombre, us.nombre AS solicitada_por_nombre,
+              ua.nombre AS atendida_por_nombre
+       FROM solicitudes_ensayo s
+       LEFT JOIN clientes c ON c.id = s.cliente_id
+       JOIN usuarios us ON us.id = s.solicitada_por
+       LEFT JOIN usuarios ua ON ua.id = s.atendida_por
+       WHERE s.modulo = $1 AND s.estado = 'en_proceso'
+       ORDER BY s.creada_en`, [modulo]
+    );
+    res.json(rows.map(s => ({
+      id: s.id, tipo: s.tipo, folio: s.folio,
+      cliente_id: s.cliente_id, cliente_nombre: s.cliente_nombre,
+      referencia: s.referencia, denominacion: s.denominacion,
+      of: ofDeModulo(s), solicitante: s.solicitada_por_nombre,
+      atendida_por_nombre: s.atendida_por_nombre,
+    })));
+  } catch (e) { next(e); }
+});
+
+// Conteo de reportes pendientes por módulo (para el punto del menú lateral).
+router.get('/pendientes-conteo', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT modulo, count(*)::int AS n FROM solicitudes_ensayo
+       WHERE estado = 'en_proceso' AND modulo IS NOT NULL GROUP BY modulo`
+    );
+    const conteo = { registro: 0, cromado: 0, inyeccion: 0, pintura: 0 };
+    for (const r of rows) if (r.modulo in conteo) conteo[r.modulo] = r.n;
+    res.json(conteo);
   } catch (e) { next(e); }
 });
 
@@ -74,15 +134,20 @@ router.post('/', requireRol('solicitante'), async (req, res, next) => {
   const cliente = await pool.connect();
   try {
     const {
-      tipo, area_id, cliente_id, referencia, denominacion,
+      tipo, modulo, cliente_id, referencia, denominacion,
       of_cromado, of_inyeccion, of_ensamble, of_pintura,
       proveedor, numero_etiqueta, color_material, fecha_caducidad,
       notas, lineas
     } = req.body;
 
     if (!['SE', 'SEMP'].includes(tipo)) return res.status(400).json({ error: 'Tipo de solicitud inválido (SE o SEMP)' });
-    if (!area_id) return res.status(400).json({ error: 'Indica el área del laboratorio que atenderá la solicitud' });
+    if (!MODULOS[modulo]) return res.status(400).json({ error: 'Indica el módulo destino de la solicitud' });
     if (!referencia || !referencia.trim()) return res.status(400).json({ error: 'La referencia es requerida' });
+
+    // El área que atiende se deduce del módulo elegido.
+    const { rows: areaRows } = await cliente.query('SELECT id FROM areas WHERE nombre = $1', [MODULOS[modulo].area]);
+    if (!areaRows[0]) return res.status(400).json({ error: `No existe el área ${MODULOS[modulo].area} para el módulo elegido` });
+    const area_id = areaRows[0].id;
     const ensayos = (lineas || [])
       .map((l, i) => ({ orden: i + 1, ensayo: (l.ensayo || '').trim(), num_muestras: l.num_muestras, observaciones: (l.observaciones || '').trim() || null }))
       .filter(l => l.ensayo);
@@ -93,11 +158,11 @@ router.post('/', requireRol('solicitante'), async (req, res, next) => {
     const folio = folioRows[0].folio;
     const { rows } = await cliente.query(
       `INSERT INTO solicitudes_ensayo
-         (tipo, folio, area_id, cliente_id, referencia, denominacion,
+         (tipo, folio, area_id, modulo, cliente_id, referencia, denominacion,
           of_cromado, of_inyeccion, of_ensamble, of_pintura,
           proveedor, numero_etiqueta, color_material, fecha_caducidad, notas, solicitada_por)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
-      [tipo, folio, area_id, cliente_id || null, referencia.trim(), (denominacion || '').trim() || null,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+      [tipo, folio, area_id, modulo, cliente_id || null, referencia.trim(), (denominacion || '').trim() || null,
        of_cromado || null, of_inyeccion || null, of_ensamble || null, of_pintura || null,
        proveedor || null, numero_etiqueta || null, color_material || null, fecha_caducidad || null,
        notas || null, req.session.user.id]
@@ -171,6 +236,23 @@ router.put('/:id(\\d+)/cancelar', requireRol('solicitante'), async (req, res, ne
     );
     if (!rows[0]) return res.status(404).json({ error: 'Solicitud no encontrada o ya cerrada' });
     res.json(await cargarSolicitud(rows[0].id));
+  } catch (e) { next(e); }
+});
+
+// Borrado DEFINITIVO de la solicitud (a diferencia de Cancelar, que deja traza):
+// admin global o admin del área que la atiende. Las líneas de ensayo caen en cascada.
+router.delete('/:id(\\d+)', requireAuth, async (req, res, next) => {
+  try {
+    const { rows: act } = await query(
+      `SELECT a.nombre AS area_nombre FROM solicitudes_ensayo s
+       JOIN areas a ON a.id = s.area_id WHERE s.id = $1`, [req.params.id]
+    );
+    if (!act[0]) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    if (!esDeArea(req.session.user, act[0].area_nombre, true)) {
+      return res.status(403).json({ error: `Solo admin o el admin de ${act[0].area_nombre} puede borrar esta solicitud` });
+    }
+    await query('DELETE FROM solicitudes_ensayo WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { textoLimite, fueraDeLimite, niTotalBase } from '../especs.js';
 import { val } from '../validaciones.js';
@@ -55,6 +55,8 @@ export default function NuevoRegistro() {
   const navigate = useNavigate();
   const { id } = useParams();
   const edicion = Boolean(id);
+  // Precarga desde una solicitud de ensayos (botón "Generar reporte"), solo en alta.
+  const [sp] = useSearchParams();
   const [cargandoReg, setCargandoReg] = useState(edicion);
   const normaDeseada = useRef(null);
   const [clientes, setClientes] = useState([]);
@@ -62,10 +64,13 @@ export default function NuevoRegistro() {
   const [especs, setEspecs] = useState([]);
   const [especId, setEspecId] = useState('');
 
-  const [cabecera, setCabecera] = useState({
-    cliente_id: '', referencia: '', denominacion: '', of: '', barra: '',
+  const [cabecera, setCabecera] = useState(() => ({
+    cliente_id: (!id && sp.get('cliente_id')) || '',
+    referencia: (!id && sp.get('referencia')) || '',
+    denominacion: (!id && sp.get('denominacion')) || '',
+    of: (!id && sp.get('of')) || '', barra: '',
     fecha_produccion: '', fecha_prueba: new Date().toISOString().slice(0, 10), observaciones: ''
-  });
+  }));
   const [piezas, setPiezas] = useState([PIEZA_VACIA(1, 'HCD'), PIEZA_VACIA(2, 'LCD')]);
   const [resultadoManual, setResultadoManual] = useState('');
   const [archivos, setArchivos] = useState([]);

@@ -7,6 +7,7 @@ import { esQuimico } from './Registros.jsx';
 import { useConfirmar } from '../components/Confirmar.jsx';
 import { useAviso } from '../components/Aviso.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import CamaraCaptura from '../components/CamaraCaptura.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 function Valor({ limites, clave, valor, unidad = '', base = null }) {
@@ -18,6 +19,7 @@ function Valor({ limites, clave, valor, unidad = '', base = null }) {
 // Fotos de una sección del registro: muestra (general), step o poros (por pieza).
 function FotosSeccion({ registroId, piezaId, seccion, titulo, imagenes, puedeEditar, onCambio, onAbrir, confirmar, avisar }) {
   const inputRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
 
   const agregar = async (e) => {
     const archivos = [...e.target.files];
@@ -59,7 +61,14 @@ function FotosSeccion({ registroId, piezaId, seccion, titulo, imagenes, puedeEdi
         {puedeEditar && (
           <>
             <button type="button" className="chico secundario" onClick={() => inputRef.current.click()}>+ Foto</button>
+            <button type="button" className="chico secundario" onClick={() => setCamaraAbierta(true)}>📷 Tomar foto</button>
             <input ref={inputRef} type="file" accept="image/jpeg,image/png" multiple hidden onChange={agregar} />
+            {camaraAbierta && (
+              <CamaraCaptura
+                onCaptura={file => agregar({ target: { files: [file] } })}
+                onCerrar={() => setCamaraAbierta(false)}
+              />
+            )}
           </>
         )}
       </div>
@@ -98,6 +107,9 @@ export default function RegistroDetalle() {
   // sobre registros ya aprobados y no anulados.
   const puedeFirmar = registro.aprobado_por && !registro.anulado_por && !registro.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
+  // Anular y Borrar: admin global o admin de Químico (área de este módulo).
+  const puedeGestionar = user.rol === 'admin' ||
+    (user.rol === 'admin_area' && user.area_nombre === 'Químico');
 
   const aprobar = async () => {
     try {
@@ -173,10 +185,10 @@ export default function RegistroDetalle() {
           )}
           {puedeAprobar && <button onClick={aprobar}>Aprobar</button>}
           {puedeFirmar && <button onClick={firmar}>Firmar</button>}
-          {user.rol === 'admin' && !registro.anulado_por && (
+          {puedeGestionar && !registro.anulado_por && (
             <button className="secundario peligro" onClick={() => setAnulando(true)}>Anular</button>
           )}
-          {user.rol === 'admin' && (
+          {puedeGestionar && (
             <button className="secundario peligro" onClick={borrar}>Borrar</button>
           )}
         </div>

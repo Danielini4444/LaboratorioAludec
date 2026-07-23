@@ -7,6 +7,7 @@ import { useConfirmar } from '../components/Confirmar.jsx';
 import { useAviso } from '../components/Aviso.jsx';
 import CargaFotos from '../components/CargaFotos.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import CamaraCaptura from '../components/CamaraCaptura.jsx';
 import Cargando from '../components/Cargando.jsx';
 import { val } from '../validaciones.js';
 
@@ -179,6 +180,7 @@ function FormAprobar({ reporte, onAprobado, onCancelar }) {
 
 function FotosPrueba({ prueba, puedeEditar, onCambio, onAbrir, confirmar, avisar }) {
   const inputRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
 
   const agregar = async (e) => {
     const archivos = [...e.target.files];
@@ -216,7 +218,14 @@ function FotosPrueba({ prueba, puedeEditar, onCambio, onAbrir, confirmar, avisar
       {puedeEditar && (
         <>
           <button type="button" className="chico secundario" onClick={() => inputRef.current.click()}>+ Foto</button>
+          <button type="button" className="chico secundario" onClick={() => setCamaraAbierta(true)}>📷 Tomar foto</button>
           <input ref={inputRef} type="file" accept="image/jpeg,image/png" multiple hidden onChange={agregar} />
+          {camaraAbierta && (
+            <CamaraCaptura
+              onCaptura={file => agregar({ target: { files: [file] } })}
+              onCerrar={() => setCamaraAbierta(false)}
+            />
+          )}
         </>
       )}
     </div>
@@ -279,6 +288,9 @@ export default function ReporteDetalle() {
   // sobre reportes ya aprobados y no anulados.
   const puedeFirmar = aprobado && !anulado && !reporte.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
+  // Anular y Borrar: admin global o admin de Metrología (área de este módulo).
+  const puedeGestionar = user.rol === 'admin' ||
+    (user.rol === 'admin_area' && user.area_nombre === 'Metrología');
 
   const firmar = async () => {
     if (!await confirmar({
@@ -354,10 +366,10 @@ export default function ReporteDetalle() {
           {captura && !agregando && <button onClick={() => setAgregando(true)}>Agregar prueba</button>}
           {puedeAprobar && !aprobando && <button onClick={() => setAprobando(true)}>Aprobar y emitir</button>}
           {puedeFirmar && <button onClick={firmar}>Firmar</button>}
-          {user.rol === 'admin' && !anulado && (
+          {puedeGestionar && !anulado && (
             <button className="secundario peligro" onClick={() => setAnulando(true)}>Anular</button>
           )}
-          {user.rol === 'admin' && (
+          {puedeGestionar && (
             <button className="secundario peligro" onClick={borrar}>Borrar</button>
           )}
         </div>

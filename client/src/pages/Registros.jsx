@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { useDebounce } from '../components/useDebounce.js';
+import AvisoReportesPendientes from '../components/AvisoReportesPendientes.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 export function esQuimico(user) {
@@ -49,6 +50,9 @@ export default function Registros() {
         </div>
         {esQuimico(user) && <Link className="boton" to="/registros/nuevo">+ Nuevo registro</Link>}
       </div>
+
+      <AvisoReportesPendientes modulo="registro" />
+
       <div className="barra-busqueda">
         <select value={clienteId} onChange={e => setClienteId(e.target.value)}>
           <option value="">Todos los clientes</option>

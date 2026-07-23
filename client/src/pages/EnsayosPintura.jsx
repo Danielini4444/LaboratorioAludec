@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { esMetrologia } from './ReportesEnsayo.jsx';
 import { useDebounce } from '../components/useDebounce.js';
+import AvisoReportesPendientes from '../components/AvisoReportesPendientes.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 // Folio para mostrar: Pin_0001.
@@ -49,6 +50,9 @@ export default function EnsayosPintura() {
         </div>
         {esMetrologia(user) && <Link className="boton" to="/pintura/nuevo">+ Nuevo ensayo</Link>}
       </div>
+
+      <AvisoReportesPendientes modulo="pintura" />
+
       <div className="barra-busqueda">
         <select value={clienteId} onChange={e => setClienteId(e.target.value)}>
           <option value="">Todos los clientes</option>

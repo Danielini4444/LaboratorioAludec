@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useAuth, ROLES_NOMBRE } from '../App.jsx';
 import { CAMPOS_NORMA, textoLimite } from '../especs.js';
+import { textoRangoCapa } from '../especsPintura.js';
 import { val, cumple } from '../validaciones.js';
+
+const CAPA_VACIA = { nombre: '', espesor_min: '', espesor_max: '' };
 
 const ROLES_DE_AREA = ['admin_area', 'usuario_area'];
 
@@ -600,6 +603,132 @@ function Clientes({ soloLectura }) {
   );
 }
 
+function FormEspecPintura({ espec, clientes, onGuardada, onCancelar }) {
+  const [clienteId, setClienteId] = useState(espec ? String(espec.cliente_id) : '');
+  const [norma, setNorma] = useState(espec ? espec.norma : '');
+  const [capas, setCapas] = useState(() =>
+    espec && espec.capas.length
+      ? espec.capas.map(c => ({
+          nombre: c.nombre,
+          espesor_min: c.espesor_min ?? '',
+          espesor_max: c.espesor_max ?? ''
+        }))
+      : [{ ...CAPA_VACIA }]);
+  const [error, setError] = useState('');
+
+  const setCapa = (i, campo, v) => setCapas(cs => cs.map((c, j) => j === i ? { ...c, [campo]: v } : c));
+  const agregarCapa = () => setCapas(cs => [...cs, { ...CAPA_VACIA }]);
+  const quitarCapa = (i) => setCapas(cs => cs.length === 1 ? [{ ...CAPA_VACIA }] : cs.filter((_, j) => j !== i));
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const cuerpo = { cliente_id: Number(clienteId), norma, capas: capas.filter(c => c.nombre.trim()) };
+      if (espec) await api(`/especificaciones-pintura/${espec.id}`, { method: 'PUT', body: cuerpo });
+      else await api('/especificaciones-pintura', { method: 'POST', body: cuerpo });
+      onGuardada();
+    } catch (e) { setError(e.message); }
+  };
+
+  return (
+    <form className="tarjeta formulario" onSubmit={enviar}>
+      <h3>{espec ? `${espec.cliente_nombre} — ${espec.norma}` : 'Nueva especificación de pintura'}</h3>
+      <div className="fila">
+        <label>Cliente
+          <select value={clienteId} onChange={e => setClienteId(e.target.value)} required disabled={!!espec}>
+            <option value="">— elegir —</option>
+            {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        </label>
+        <label>Norma<input value={norma} onChange={e => setNorma(e.target.value)} required {...val('norma')} /></label>
+      </div>
+      <table className="tabla mediciones">
+        <thead>
+          <tr><th>Capa</th><th>Mínimo (µm)</th><th>Máximo (µm)</th><th style={{ width: 40 }}></th></tr>
+        </thead>
+        <tbody>
+          {capas.map((c, i) => (
+            <tr key={i}>
+              <td><input value={c.nombre} onChange={e => setCapa(i, 'nombre', e.target.value)}
+                placeholder="Primer, Base, Transparente, Total…" style={{ width: '100%', textAlign: 'left' }} /></td>
+              <td><input type="number" step="any" value={c.espesor_min} onChange={e => setCapa(i, 'espesor_min', e.target.value)} /></td>
+              <td><input type="number" step="any" value={c.espesor_max} onChange={e => setCapa(i, 'espesor_max', e.target.value)} /></td>
+              <td><button type="button" className="btn-quitar-fila" onClick={() => quitarCapa(i)} title="Quitar">×</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="meta">Vacío = sin límite. Cada capa se valida contra su rango al capturar el ensayo de pintura.</div>
+      <button type="button" className="boton secundario chico" onClick={agregarCapa} style={{ marginTop: 10 }}>+ Agregar capa</button>
+      {error && <div className="error">{error}</div>}
+      <div className="acciones" style={{ marginTop: 12 }}>
+        <button type="submit">Guardar especificación</button>
+        <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
+      </div>
+    </form>
+  );
+}
+
+function EspecsPintura({ soloLectura }) {
+  const [especs, setEspecs] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [editando, setEditando] = useState(null); // null | 'nueva' | espec
+
+  const cargar = () => api('/especificaciones-pintura?todas=1').then(setEspecs).catch(() => {});
+  useEffect(() => {
+    cargar();
+    api('/clientes').then(setClientes).catch(() => {});
+  }, []);
+
+  const alternarActiva = async (e) => {
+    try {
+      await api(`/especificaciones-pintura/${e.id}`, { method: 'PUT', body: { activa: !e.activa } });
+      cargar();
+    } catch (err) { alert(err.message); }
+  };
+
+  const resumen = (e) => (e.capas || [])
+    .map(c => `${c.nombre}: ${textoRangoCapa(c)}`)
+    .join('  ·  ');
+
+  return (
+    <div>
+      {editando && (
+        <FormEspecPintura
+          espec={editando === 'nueva' ? null : editando}
+          clientes={clientes}
+          onGuardada={() => { setEditando(null); cargar(); }}
+          onCancelar={() => setEditando(null)}
+        />
+      )}
+      {!soloLectura && !editando && (
+        <div className="barra-busqueda">
+          <button onClick={() => setEditando('nueva')}>Nueva especificación</button>
+        </div>
+      )}
+      {especs.map(e => (
+        <div className="tarjeta" key={e.id}>
+          <div className="ensayo-titulo">
+            <strong>{e.cliente_nombre}</strong> · {e.norma}
+            {!e.activa && <span className="badge mal">Inactiva</span>}
+            {!soloLectura && (
+              <span className="acciones">
+                <button className="chico" onClick={() => setEditando(e)}>Editar</button>
+                <button className="chico secundario" onClick={() => alternarActiva(e)}>
+                  {e.activa ? 'Desactivar' : 'Activar'}
+                </button>
+              </span>
+            )}
+          </div>
+          <div className="meta">{resumen(e) || 'sin capas definidas'}</div>
+        </div>
+      ))}
+      {!especs.length && <div className="vacio">Sin especificaciones de pintura registradas</div>}
+    </div>
+  );
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const [tab, setTab] = useState('usuarios');
@@ -609,18 +738,22 @@ export default function Admin() {
     <div>
       <div className="encabezado-pagina">
         <h2>Administración {soloLectura && <span className="badge">solo lectura</span>}</h2>
-        <p className="descripcion">Usuarios del sistema, catálogo de piezas, normas por cliente y clientes.</p>
+        <p className="descripcion">Usuarios del sistema, catálogo de piezas, normas y especificaciones de pintura por cliente, equipos y clientes.</p>
       </div>
       <div className="tabs">
-        {['usuarios', 'piezas', 'normas', 'equipos', 'clientes'].map(t => (
+        {[
+          ['usuarios', 'Usuarios'], ['piezas', 'Piezas'], ['normas', 'Normas'],
+          ['pintura', 'Pintura'], ['equipos', 'Equipos'], ['clientes', 'Clientes']
+        ].map(([t, etiqueta]) => (
           <button key={t} className={tab === t ? 'tab activo' : 'tab'} onClick={() => setTab(t)}>
-            {t[0].toUpperCase() + t.slice(1)}
+            {etiqueta}
           </button>
         ))}
       </div>
       {tab === 'usuarios' && <Usuarios soloLectura={soloLectura} />}
       {tab === 'piezas' && <Piezas soloLectura={soloLectura} />}
       {tab === 'normas' && <Normas soloLectura={soloLectura} />}
+      {tab === 'pintura' && <EspecsPintura soloLectura={soloLectura} />}
       {tab === 'equipos' && <Equipos soloLectura={soloLectura} />}
       {tab === 'clientes' && <Clientes soloLectura={soloLectura} />}
     </div>

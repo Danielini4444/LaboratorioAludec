@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
-import { ESTADOS } from '../ensayosCatalogo.js';
+import { ESTADOS, moduloPorKey, rutaGenerarReporte, ofDeSolicitud } from '../ensayosCatalogo.js';
 import { puedeSolicitar } from './SolicitudesEnsayo.jsx';
+import { useConfirmar } from '../components/Confirmar.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 const fecha = (v) => (v ? new Date(v).toLocaleDateString('es-MX') : '—');
@@ -25,6 +26,7 @@ function Campo({ etiqueta, valor }) {
 
 export default function SolicitudDetalle() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [solicitud, setSolicitud] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -32,6 +34,7 @@ export default function SolicitudDetalle() {
   const [cancelando, setCancelando] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [trabajando, setTrabajando] = useState(false);
+  const [confirmar, dialogoConfirmar] = useConfirmar();
 
   const recargar = () => api(`/solicitudes-ensayo/${id}`).then(setSolicitud).catch(() => setSolicitud(null));
 
@@ -60,6 +63,20 @@ export default function SolicitudDetalle() {
     finally { setTrabajando(false); }
   };
 
+  // Borrado definitivo (sin traza, a diferencia de Cancelar): admin o admin del área.
+  const borrar = async () => {
+    if (!await confirmar({
+      titulo: `Borrar solicitud ${solicitud.tipo}-${solicitud.folio}`,
+      mensaje: 'La solicitud se borra DEFINITIVAMENTE con sus líneas de ensayo, sin dejar traza (a diferencia de Cancelar). Esta acción no se puede deshacer.',
+      textoConfirmar: 'Borrar definitivamente',
+      peligro: true
+    })) return;
+    try {
+      await api(`/solicitudes-ensayo/${id}`, { method: 'DELETE' });
+      navigate('/solicitudes');
+    } catch (e) { setError(e.message); }
+  };
+
   if (cargando) return <Cargando />;
   if (!solicitud) return <div className="vacio-bloque">Solicitud no encontrada. <Link to="/solicitudes">Volver</Link></div>;
 
@@ -68,6 +85,12 @@ export default function SolicitudDetalle() {
   const abierta = s.estado === 'pendiente' || s.estado === 'en_proceso';
   const puedeAtender = atiendeArea(user, s.area_nombre) && abierta;
   const puedeCancelar = puedeSolicitar(user) && abierta;
+  // Borrado definitivo: admin global o admin del área que atiende (cualquier estado).
+  const puedeBorrar = user.rol === 'admin' ||
+    (user.rol === 'admin_area' && user.area_nombre === s.area_nombre);
+  const modulo = moduloPorKey(s.modulo);
+  // Reporte pendiente: la solicitud ya fue tomada (en proceso) y la atiende su área.
+  const puedeGenerarReporte = s.estado === 'en_proceso' && modulo && atiendeArea(user, s.area_nombre);
 
   return (
     <div>
@@ -79,6 +102,7 @@ export default function SolicitudDetalle() {
           </h2>
           <div className="subtitulo">
             {esMP ? 'Solicitud de ensayos de materia prima · FM-15-01A' : 'Solicitud de ensayos de producto · FM-15-01'}
+            {' · '}Módulo: {modulo ? modulo.etiqueta : '—'}
             {' · '}Atiende: {s.area_nombre}
           </div>
         </div>
@@ -86,17 +110,30 @@ export default function SolicitudDetalle() {
           {puedeAtender && s.estado === 'pendiente' && (
             <button disabled={trabajando} onClick={() => cambiarEstado('en_proceso')}>Tomar solicitud</button>
           )}
+          {puedeGenerarReporte && (
+            <button onClick={() => navigate(rutaGenerarReporte(s))}>Generar reporte</button>
+          )}
           {puedeAtender && (
             <button disabled={trabajando} onClick={() => cambiarEstado('completada')}>Marcar completada</button>
           )}
           {puedeCancelar && !cancelando && (
             <button className="secundario peligro" onClick={() => setCancelando(true)}>Cancelar</button>
           )}
+          {puedeBorrar && (
+            <button className="secundario peligro" onClick={borrar}>Borrar</button>
+          )}
           <Link to="/solicitudes" className="boton secundario">Volver</Link>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {puedeGenerarReporte && (
+        <div className="aviso-pendiente" role="status">
+          <span>🔔 Tienes un reporte pendiente de esta OF{ofDeSolicitud(s) ? ` (${ofDeSolicitud(s)})` : ''}.</span>
+          <button className="chico" onClick={() => navigate(rutaGenerarReporte(s))}>Generar reporte</button>
+        </div>
+      )}
 
       {cancelando && (
         <div className="tarjeta">
@@ -177,6 +214,8 @@ export default function SolicitudDetalle() {
           {s.estado === 'cancelada' && <Campo etiqueta="Motivo de cancelación" valor={s.motivo_cancelacion} />}
         </div>
       </div>
+
+      {dialogoConfirmar}
     </div>
   );
 }

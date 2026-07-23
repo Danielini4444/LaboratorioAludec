@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
-import { ensayosDe } from '../ensayosCatalogo.js';
+import { ensayosDe, MODULOS } from '../ensayosCatalogo.js';
 import { val } from '../validaciones.js';
 
 const LINEA_VACIA = { ensayo: '', num_muestras: '', observaciones: '' };
 
 const FORM_VACIO = {
-  tipo: 'SE', area_id: '', cliente_id: '', referencia: '', denominacion: '',
+  tipo: 'SE', modulo: '', cliente_id: '', referencia: '', denominacion: '',
   of_cromado: '', of_inyeccion: '', of_ensamble: '', of_pintura: '',
   proveedor: '', numero_etiqueta: '', color_material: '', fecha_caducidad: '',
   notas: '',
@@ -18,14 +18,12 @@ export default function NuevaSolicitud() {
   const [form, setForm] = useState({ ...FORM_VACIO });
   const [lineas, setLineas] = useState([{ ...LINEA_VACIA }]);
   const [clientes, setClientes] = useState([]);
-  const [areas, setAreas] = useState([]);
   const [piezas, setPiezas] = useState([]);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     api('/clientes').then(setClientes).catch(() => {});
-    api('/areas').then(setAreas).catch(() => {});
     api('/piezas').then(ps => setPiezas(ps.filter(p => p.activa))).catch(() => {});
   }, []);
 
@@ -67,7 +65,6 @@ export default function NuevaSolicitud() {
         body: {
           ...form,
           cliente_id: form.cliente_id ? Number(form.cliente_id) : null,
-          area_id: Number(form.area_id),
           fecha_caducidad: esMP ? (form.fecha_caducidad || null) : null,
           lineas: lineas
             .filter(l => l.ensayo.trim())
@@ -99,10 +96,10 @@ export default function NuevaSolicitud() {
               <option value="SEMP">SEMP · Ensayos de materia prima — FM-15-01A</option>
             </select>
           </label>
-          <label>Área que atiende
-            <select value={form.area_id} onChange={set('area_id')} required>
+          <label>Módulo destino
+            <select value={form.modulo} onChange={set('modulo')} required>
               <option value="">— elegir —</option>
-              {areas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+              {MODULOS.map(m => <option key={m.key} value={m.key}>{m.etiqueta}</option>)}
             </select>
           </label>
         </div>

@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { query, pool } = require('../db');
-const { requireAuth, requireRol, requireQuimico, requireFirmante } = require('../auth');
+const { requireAuth, requireQuimico, requireFirmante } = require('../auth');
 const { generarToken, qrDeFirma } = require('../firma');
 const generarRegistroPdf = require('../pdf/registroPdf');
 
@@ -307,7 +307,8 @@ router.put('/:id(\\d+)/firmar', requireFirmante, async (req, res, next) => {
 });
 
 // Anulación con traza (en vez de borrado): el registro queda visible y marcado.
-router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
+// Admin global o admin de Químico.
+router.put('/:id(\\d+)/anular', requireQuimico(true), async (req, res, next) => {
   try {
     const motivo = (req.body.motivo || '').trim();
     if (!motivo) return res.status(400).json({ error: 'El motivo de la anulación es obligatorio' });
@@ -322,9 +323,10 @@ router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
 });
 
 // Borrado DEFINITIVO del registro completo (a diferencia de Anular, que deja
-// traza): solo admin, y aplica aunque el registro esté aprobado o firmado.
-// Piezas, mediciones e imágenes caen en cascada; las fotos se limpian del disco.
-router.delete('/:id(\\d+)', requireRol(), async (req, res, next) => {
+// traza): admin global o admin de Químico, y aplica aunque el registro esté
+// aprobado o firmado. Piezas, mediciones e imágenes caen en cascada; las fotos
+// se limpian del disco.
+router.delete('/:id(\\d+)', requireQuimico(true), async (req, res, next) => {
   try {
     const { rows: fotos } = await query(
       'SELECT archivo FROM registro_imagenes WHERE registro_id = $1', [req.params.id]

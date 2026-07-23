@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { val } from '../validaciones.js';
 
@@ -12,7 +12,15 @@ const FORM_VACIO = {
 
 export default function NuevoReporte() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ ...FORM_VACIO });
+  // Precarga desde una solicitud de ensayos (botón "Generar reporte").
+  const [sp] = useSearchParams();
+  const [form, setForm] = useState(() => ({
+    ...FORM_VACIO,
+    of: sp.get('of') || '',
+    cliente_id: sp.get('cliente_id') || '',
+    referencia: sp.get('referencia') || '',
+    denominacion: sp.get('denominacion') || '',
+  }));
   const [clientes, setClientes] = useState([]);
   const [piezas, setPiezas] = useState([]);
   const [error, setError] = useState('');

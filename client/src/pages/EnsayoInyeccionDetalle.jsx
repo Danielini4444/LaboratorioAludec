@@ -7,6 +7,7 @@ import { folioIny } from './EnsayosInyeccion.jsx';
 import { useConfirmar } from '../components/Confirmar.jsx';
 import { useAviso } from '../components/Aviso.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import CamaraCaptura from '../components/CamaraCaptura.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 const FILA_VACIA = {
@@ -146,6 +147,7 @@ function DescripcionFoto({ foto, puedeEditar, avisar }) {
 // Apartado general de fotos del informe: cada foto con su descripción.
 function FotosEnsayo({ ensayo, puedeEditar, onCambio, onAbrir, confirmar, avisar }) {
   const inputRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
 
   const agregar = async (e) => {
     const archivos = [...e.target.files];
@@ -190,7 +192,14 @@ function FotosEnsayo({ ensayo, puedeEditar, onCambio, onAbrir, confirmar, avisar
         {puedeEditar && (
           <>
             <button type="button" className="chico secundario" onClick={() => inputRef.current.click()}>+ Foto</button>
+            <button type="button" className="chico secundario" onClick={() => setCamaraAbierta(true)}>📷 Tomar foto</button>
             <input ref={inputRef} type="file" accept="image/jpeg,image/png" multiple hidden onChange={agregar} />
+            {camaraAbierta && (
+              <CamaraCaptura
+                onCaptura={file => agregar({ target: { files: [file] } })}
+                onCerrar={() => setCamaraAbierta(false)}
+              />
+            )}
           </>
         )}
       </div>
@@ -228,6 +237,9 @@ export default function EnsayoInyeccionDetalle() {
     (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Metrología'));
   const puedeFirmar = aprobado && !anulado && !ensayo.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
+  // Anular y Borrar: admin global o admin de Metrología (área de este módulo).
+  const puedeGestionar = user.rol === 'admin' ||
+    (user.rol === 'admin_area' && user.area_nombre === 'Metrología');
 
   const firmar = async () => {
     if (!await confirmar({
@@ -298,10 +310,10 @@ export default function EnsayoInyeccionDetalle() {
           {captura && !agregando && <button onClick={() => { setAgregando(true); setEditando(null); }}>Agregar ensayo</button>}
           {puedeAprobar && !aprobando && <button onClick={() => setAprobando(true)}>Aprobar y emitir</button>}
           {puedeFirmar && <button onClick={firmar}>Firmar</button>}
-          {user.rol === 'admin' && !anulado && (
+          {puedeGestionar && !anulado && (
             <button className="secundario peligro" onClick={() => setAnulando(true)}>Anular</button>
           )}
-          {user.rol === 'admin' && (
+          {puedeGestionar && (
             <button className="secundario peligro" onClick={borrar}>Borrar</button>
           )}
         </div>

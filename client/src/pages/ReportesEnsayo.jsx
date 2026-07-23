@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { useDebounce } from '../components/useDebounce.js';
+import AvisoReportesPendientes from '../components/AvisoReportesPendientes.jsx';
+import AvisoQuimicoTerminados from '../components/AvisoQuimicoTerminados.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 export function esMetrologia(user) {
@@ -49,6 +51,10 @@ export default function ReportesEnsayo() {
         </div>
         {esMetrologia(user) && <Link className="boton" to="/reportes/nuevo">+ Nuevo reporte</Link>}
       </div>
+
+      <AvisoReportesPendientes modulo="cromado" />
+      <AvisoQuimicoTerminados />
+
       <div className="barra-busqueda">
         <select value={clienteId} onChange={e => setClienteId(e.target.value)}>
           <option value="">Todos los clientes</option>

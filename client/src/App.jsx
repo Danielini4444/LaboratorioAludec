@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { api } from './api.js';
 import { modoAuth, cerrarSesion } from './sso.js';
 import Login from './pages/Login.jsx';
@@ -107,10 +107,23 @@ function SinAcceso() {
   );
 }
 
+// Punto con el número de reportes pendientes de generar en un módulo.
+function PuntoPendiente({ n }) {
+  if (!n) return null;
+  return <span className="punto-pendiente" title={`${n} reporte(s) pendiente(s)`}>{n}</span>;
+}
+
 function Layout({ children }) {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const veAdmin = user.rol === 'admin' || user.rol === 'auditor_admin';
   const iniciales = user.nombre.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  // Conteo de reportes pendientes por módulo (para el punto del menú); se
+  // refresca al navegar, así el punto se actualiza al tomar/cerrar solicitudes.
+  const [pendientes, setPendientes] = useState({});
+  useEffect(() => {
+    api('/solicitudes-ensayo/pendientes-conteo').then(setPendientes).catch(() => {});
+  }, [location.pathname]);
   return (
     <div className="app">
       <aside className="sidebar">
@@ -122,10 +135,10 @@ function Layout({ children }) {
         </div>
         <nav>
           <NavLink to="/solicitudes"><IconoSolicitud /> Solicitud de ensayos</NavLink>
-          <NavLink to="/registros"><IconoRegistro /> Laboratorio químico</NavLink>
-          <NavLink to="/reportes"><IconoEnsayos /> Test de cromado</NavLink>
-          <NavLink to="/inyeccion"><IconoInyeccion /> Ensayos inyección</NavLink>
-          <NavLink to="/pintura"><IconoPintura /> Ensayos pintura</NavLink>
+          <NavLink to="/registros"><IconoRegistro /> Laboratorio químico <PuntoPendiente n={pendientes.registro} /></NavLink>
+          <NavLink to="/reportes"><IconoEnsayos /> Test de cromado <PuntoPendiente n={pendientes.cromado} /></NavLink>
+          <NavLink to="/inyeccion"><IconoInyeccion /> Ensayos inyección <PuntoPendiente n={pendientes.inyeccion} /></NavLink>
+          <NavLink to="/pintura"><IconoPintura /> Ensayos pintura <PuntoPendiente n={pendientes.pintura} /></NavLink>
           {esMetrologia(user) && <NavLink to="/planes"><IconoPlan /> Planes de prueba</NavLink>}
           <NavLink to="/imprimir"><IconoImprimir /> Imprimir por OF</NavLink>
           {veAdmin && <NavLink to="/admin"><IconoAdmin /> Administración</NavLink>}

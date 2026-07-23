@@ -4,22 +4,36 @@ import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { esMetrologia } from './ReportesEnsayo.jsx';
 import { folioPin } from './EnsayosPintura.jsx';
+import { textoRangoCapa, fueraDeRangoCapa } from '../especsPintura.js';
 import { useConfirmar } from '../components/Confirmar.jsx';
 import { useAviso } from '../components/Aviso.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import CamaraCaptura from '../components/CamaraCaptura.jsx';
 import Cargando from '../components/Cargando.jsx';
 
 const FILA_VACIA = {
   descripcion: '', exigencia: '', resultado: '', caracteristica: '', observaciones: '', conformidad: ''
 };
 
-// Promedio de los puntos de espesor numéricos (2 decimales); '—' si no hay.
-function promedio(valores) {
-  const validos = valores
-    .map(v => (v === '' || v === null || v === undefined ? null : Number(v)))
-    .filter(n => n !== null && Number.isFinite(n));
-  if (!validos.length) return '—';
-  return (validos.reduce((s, n) => s + n, 0) / validos.length).toFixed(2);
+// Combina las capas del spec con los espesores ya guardados de la pieza para
+// armar las filas de captura: primero las capas del spec (en orden, con su
+// valor guardado si existe), luego cualquier capa guardada que no esté en el
+// spec (capas libres, para no perder datos si se cambió/quitó el spec).
+function filasDeCapa(capasSpec, guardados) {
+  const porNombre = new Map((guardados || []).map(e => [e.capa, e.valor]));
+  const filas = (capasSpec || []).map(c => ({
+    capa: c.nombre,
+    valor: porNombre.has(c.nombre) && porNombre.get(c.nombre) !== null ? String(porNombre.get(c.nombre)) : '',
+    fija: true,
+  }));
+  const nombresSpec = new Set((capasSpec || []).map(c => c.nombre));
+  for (const e of guardados || []) {
+    if (!nombresSpec.has(e.capa)) {
+      filas.push({ capa: e.capa, valor: e.valor === null ? '' : String(e.valor), fija: false });
+    }
+  }
+  if (!filas.length) filas.push({ capa: '', valor: '', fija: false });
+  return filas;
 }
 
 function FormFila({ ensayo, fila, onGuardada, onCancelar }) {
@@ -131,29 +145,34 @@ function FormAprobar({ ensayo, onAprobado, onCancelar }) {
   );
 }
 
-// Tarjeta de una pieza del apartado de espesores: puntos de medición (µm) con
-// promedio en vivo, una imagen y un comentario. Editable con el informe abierto.
-function PiezaEspesores({ pieza, puedeEditar, onBorrar, onAbrir, avisar }) {
-  const [puntos, setPuntos] = useState(() =>
-    (pieza.espesores || []).map(v => (v === null || v === undefined ? '' : String(v))));
+// Capa del spec por nombre, para validar el valor capturado contra su rango.
+const capaSpecDe = (capasSpec, nombre) => (capasSpec || []).find(c => c.nombre === nombre) || null;
+
+// Tarjeta de una pieza del apartado de espesores: un valor por CAPA (validado
+// contra el rango del spec), una imagen y un comentario. Editable con el
+// informe abierto. capasSpec: capas de la especificación elegida (o []).
+function PiezaEspesores({ pieza, capasSpec, puedeEditar, onBorrar, onAbrir, avisar }) {
+  const [filas, setFilas] = useState(() => filasDeCapa(capasSpec, pieza.espesores));
   const [comentario, setComentario] = useState(pieza.comentario || '');
   const [tieneImagen, setTieneImagen] = useState(!!pieza.tiene_imagen);
   const [imgKey, setImgKey] = useState(0);
   const [guardando, setGuardando] = useState(false);
   const [sucio, setSucio] = useState(false);
   const inputImg = useRef(null);
+  const [camaraImgAbierta, setCamaraImgAbierta] = useState(false);
 
   const marcarSucio = () => setSucio(true);
-  const setPunto = (i, v) => { setPuntos(p => p.map((x, j) => j === i ? v : x)); marcarSucio(); };
-  const agregarPunto = () => { setPuntos(p => [...p, '']); marcarSucio(); };
-  const quitarPunto = (i) => { setPuntos(p => p.filter((_, j) => j !== i)); marcarSucio(); };
+  const setValor = (i, v) => { setFilas(fs => fs.map((f, j) => j === i ? { ...f, valor: v } : f)); marcarSucio(); };
+  const setNombreCapa = (i, v) => { setFilas(fs => fs.map((f, j) => j === i ? { ...f, capa: v } : f)); marcarSucio(); };
+  const agregarCapaLibre = () => { setFilas(fs => [...fs, { capa: '', valor: '', fija: false }]); marcarSucio(); };
+  const quitarFila = (i) => { setFilas(fs => fs.filter((_, j) => j !== i)); marcarSucio(); };
 
   const guardar = async () => {
     setGuardando(true);
     try {
       await api(`/ensayos-pintura/piezas/${pieza.id}`, {
         method: 'PUT',
-        body: { comentario, puntos }
+        body: { comentario, espesores: filas.map(f => ({ capa: f.capa, valor: f.valor })) }
       });
       setSucio(false);
       avisar('Pieza guardada', 'ok');
@@ -187,7 +206,6 @@ function PiezaEspesores({ pieza, puedeEditar, onBorrar, onAbrir, avisar }) {
     <div className="tarjeta">
       <div className="ensayo-titulo">
         <strong>Pieza {pieza.numero}</strong>
-        <span className="badge pendiente">Promedio: {promedio(puntos)} µm</span>
         {puedeEditar && (
           <span className="acciones">
             <button className="chico" onClick={guardar} disabled={guardando || !sucio}>
@@ -199,20 +217,58 @@ function PiezaEspesores({ pieza, puedeEditar, onBorrar, onAbrir, avisar }) {
       </div>
 
       <div style={{ marginTop: 8 }}>
-        <span className="meta">Espesores (µm)</span>
-        <div className="acciones" style={{ flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-          {puntos.map((v, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-              <input type="number" step="any" inputMode="decimal" value={v}
-                onChange={e => setPunto(i, e.target.value)} disabled={!puedeEditar}
-                placeholder={`${i + 1}`} style={{ width: 72 }} />
-              {puedeEditar && <button type="button" className="chico secundario" title="Quitar punto"
-                onClick={() => quitarPunto(i)}>×</button>}
-            </span>
-          ))}
-          {!puntos.length && !puedeEditar && <span className="meta">Sin puntos capturados</span>}
-          {puedeEditar && <button type="button" className="chico secundario" onClick={agregarPunto}>+ Punto</button>}
-        </div>
+        <span className="meta">Espesores por capa (µm)</span>
+        <table className="tabla mediciones" style={{ width: '100%', marginTop: 4 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Capa</th>
+              <th style={{ width: 120 }}>Valor (µm)</th>
+              <th style={{ width: 120 }}>Rango</th>
+              <th style={{ width: 70 }}>Conf.</th>
+              {puedeEditar && <th style={{ width: 40 }}></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map((f, i) => {
+              const spec = capaSpecDe(capasSpec, f.capa);
+              const fuera = fueraDeRangoCapa(spec, f.valor);
+              const tieneValor = f.valor !== '' && f.valor !== null && f.valor !== undefined;
+              return (
+                <tr key={i}>
+                  <td style={{ textAlign: 'left' }}>
+                    {f.fija
+                      ? f.capa
+                      : (puedeEditar
+                          ? <input value={f.capa} onChange={e => setNombreCapa(i, e.target.value)}
+                              placeholder="nombre de capa" style={{ width: '100%', textAlign: 'left' }} />
+                          : (f.capa || '—'))}
+                  </td>
+                  <td>
+                    {puedeEditar
+                      ? <input type="number" step="any" inputMode="decimal" value={f.valor}
+                          className={fuera ? 'fuera' : ''} onChange={e => setValor(i, e.target.value)} />
+                      : <span className={fuera ? 'fuera' : ''}>{tieneValor ? f.valor : '—'}</span>}
+                  </td>
+                  <td>{textoRangoCapa(spec)}</td>
+                  <td>
+                    {!tieneValor || !spec
+                      ? <span className="meta">—</span>
+                      : <span className={`badge ${fuera ? 'mal' : 'ok'}`}>{fuera ? 'NOK' : 'OK'}</span>}
+                  </td>
+                  {puedeEditar && (
+                    <td>{!f.fija && <button type="button" className="btn-quitar-fila" title="Quitar capa"
+                      onClick={() => quitarFila(i)}>×</button>}</td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {puedeEditar && (
+          <button type="button" className="boton secundario chico" onClick={agregarCapaLibre} style={{ marginTop: 8 }}>
+            + Capa libre
+          </button>
+        )}
       </div>
 
       <div style={{ marginTop: 10 }}>
@@ -231,7 +287,14 @@ function PiezaEspesores({ pieza, puedeEditar, onBorrar, onAbrir, avisar }) {
               <button type="button" className="chico secundario" onClick={() => inputImg.current.click()}>
                 {tieneImagen ? 'Reemplazar imagen' : '+ Imagen'}
               </button>
+              <button type="button" className="chico secundario" onClick={() => setCamaraImgAbierta(true)}>📷 Tomar foto</button>
               <input ref={inputImg} type="file" accept="image/jpeg,image/png" hidden onChange={subirImagen} />
+              {camaraImgAbierta && (
+                <CamaraCaptura
+                  onCaptura={file => subirImagen({ target: { files: [file] } })}
+                  onCerrar={() => setCamaraImgAbierta(false)}
+                />
+              )}
             </>
           )}
         </div>
@@ -274,6 +337,7 @@ function DescripcionFoto({ foto, puedeEditar, avisar }) {
 // Apartado general de fotos del informe: cada foto con su descripción.
 function FotosEnsayo({ ensayo, puedeEditar, onCambio, onAbrir, confirmar, avisar }) {
   const inputRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
 
   const agregar = async (e) => {
     const archivos = [...e.target.files];
@@ -318,7 +382,14 @@ function FotosEnsayo({ ensayo, puedeEditar, onCambio, onAbrir, confirmar, avisar
         {puedeEditar && (
           <>
             <button type="button" className="chico secundario" onClick={() => inputRef.current.click()}>+ Foto</button>
+            <button type="button" className="chico secundario" onClick={() => setCamaraAbierta(true)}>📷 Tomar foto</button>
             <input ref={inputRef} type="file" accept="image/jpeg,image/png" multiple hidden onChange={agregar} />
+            {camaraAbierta && (
+              <CamaraCaptura
+                onCaptura={file => agregar({ target: { files: [file] } })}
+                onCerrar={() => setCamaraAbierta(false)}
+              />
+            )}
           </>
         )}
       </div>
@@ -341,10 +412,17 @@ export default function EnsayoPinturaDetalle() {
   const [confirmar, dialogoConfirmar] = useConfirmar();
   const [avisar, vistaAviso] = useAviso();
 
+  const [especs, setEspecs] = useState([]); // especificaciones de pintura activas del cliente
+
   const cargar = useCallback(() => {
     api(`/ensayos-pintura/${id}`).then(setEnsayo).catch(e => setError(e.message));
   }, [id]);
   useEffect(() => { cargar(); }, [cargar]);
+
+  useEffect(() => {
+    if (!ensayo?.cliente_id) return;
+    api(`/especificaciones-pintura?cliente_id=${ensayo.cliente_id}`).then(setEspecs).catch(() => {});
+  }, [ensayo?.cliente_id]);
 
   if (error) return <div className="error">{error}</div>;
   if (!ensayo) return <Cargando />;
@@ -356,6 +434,20 @@ export default function EnsayoPinturaDetalle() {
     (user.rol === 'admin' || (user.rol === 'admin_area' && user.area_nombre === 'Metrología'));
   const puedeFirmar = aprobado && !anulado && !ensayo.firmado_por &&
     (user.rol === 'admin' || user.rol === 'admin_area');
+  // Anular y Borrar: admin global o admin de Metrología (área de este módulo).
+  const puedeGestionar = user.rol === 'admin' ||
+    (user.rol === 'admin_area' && user.area_nombre === 'Metrología');
+
+  // Elige (o quita) la especificación de espesores de pintura del informe.
+  const cambiarEspec = async (espId) => {
+    try {
+      await api(`/ensayos-pintura/${id}`, {
+        method: 'PUT',
+        body: { especificacion_pintura_id: espId ? Number(espId) : null }
+      });
+      cargar();
+    } catch (e) { avisar(e.message); }
+  };
 
   const firmar = async () => {
     if (!await confirmar({
@@ -441,10 +533,10 @@ export default function EnsayoPinturaDetalle() {
           {captura && !agregando && <button onClick={() => { setAgregando(true); setEditando(null); }}>Agregar ensayo</button>}
           {puedeAprobar && !aprobando && <button onClick={() => setAprobando(true)}>Aprobar y emitir</button>}
           {puedeFirmar && <button onClick={firmar}>Firmar</button>}
-          {user.rol === 'admin' && !anulado && (
+          {puedeGestionar && !anulado && (
             <button className="secundario peligro" onClick={() => setAnulando(true)}>Anular</button>
           )}
-          {user.rol === 'admin' && (
+          {puedeGestionar && (
             <button className="secundario peligro" onClick={borrar}>Borrar</button>
           )}
         </div>
@@ -546,13 +638,39 @@ export default function EnsayoPinturaDetalle() {
         <h3>Espesores por pieza</h3>
         {captura && <button className="chico" onClick={agregarPieza}>+ Pieza</button>}
       </div>
+
+      <div className="tarjeta">
+        <div className="fila">
+          <label>Especificación de espesores (por cliente)
+            {captura ? (
+              <select value={ensayo.especificacion_pintura_id || ''} onChange={e => cambiarEspec(e.target.value)}>
+                <option value="">— sin especificación —</option>
+                {especs.map(e => <option key={e.id} value={e.id}>{e.norma}</option>)}
+              </select>
+            ) : (
+              <div className="val">{ensayo.especificacion ? ensayo.especificacion.norma : '—'}</div>
+            )}
+          </label>
+        </div>
+        {ensayo.especificacion?.capas?.length ? (
+          <div className="meta" style={{ marginTop: 4 }}>
+            Capas: {ensayo.especificacion.capas.map(c => `${c.nombre} (${textoRangoCapa(c)})`).join('  ·  ')}
+          </div>
+        ) : (
+          <div className="meta" style={{ marginTop: 4 }}>
+            Sin especificación: las capas se capturan libres, sin validación. Se dan de alta en Administración › Pintura.
+          </div>
+        )}
+      </div>
+
       {!ensayo.piezas.length && (
-        <div className="vacio">Todavía no hay piezas. {captura ? 'Agrega una por cada pieza con sus espesores, imagen y comentario.' : ''}</div>
+        <div className="vacio">Todavía no hay piezas. {captura ? 'Agrega una por cada pieza con sus espesores por capa, imagen y comentario.' : ''}</div>
       )}
       {ensayo.piezas.map(p => (
         <PiezaEspesores
-          key={p.id}
+          key={`${p.id}-${ensayo.especificacion_pintura_id || 'none'}`}
           pieza={p}
+          capasSpec={ensayo.especificacion?.capas || []}
           puedeEditar={captura}
           onBorrar={borrarPieza}
           onAbrir={setFoto}

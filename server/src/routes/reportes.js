@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { query } = require('../db');
-const { requireAuth, requireRol, requireArea, requireFirmante } = require('../auth');
+const { requireAuth, requireArea, requireFirmante } = require('../auth');
 const { generarToken, qrDeFirma } = require('../firma');
 const generarReportePdf = require('../pdf/reportePdf');
 
@@ -66,6 +66,32 @@ router.get('/', requireAuth, async (req, res, next) => {
        JOIN clientes c ON c.id = r.cliente_id
        JOIN usuarios u ON u.id = r.realizado_por
        ${where} ORDER BY r.folio DESC LIMIT 300`, params
+    );
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+// Registros de espesores del laboratorio químico YA TERMINADOS (aprobados por
+// el admin químico) que todavía no tienen su reporte de cromado para esa OF.
+// Alimenta el aviso "Un reporte pendiente terminado de laboratorio químico" en
+// Test de cromado. Se limpia solo cuando existe un reporte de cromado (no
+// anulado) con la misma OF.
+router.get('/pendientes-quimico', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT r.id, r.reporte_no, r.of, r.denominacion, r.referencia,
+              r.cliente_id, c.nombre AS cliente_nombre, r.aprobado_en
+       FROM registros_espesores r
+       JOIN clientes c ON c.id = r.cliente_id
+       WHERE r.aprobado_por IS NOT NULL AND r.anulado_por IS NULL
+         AND r.of IS NOT NULL AND btrim(r.of) <> ''
+         AND NOT EXISTS (
+           SELECT 1 FROM reportes_ensayo re
+           WHERE re.anulado_por IS NULL AND re.of IS NOT NULL
+             AND lower(btrim(re.of)) = lower(btrim(r.of))
+         )
+       ORDER BY r.aprobado_en DESC NULLS LAST, r.id DESC
+       LIMIT 100`
     );
     res.json(rows);
   } catch (e) { next(e); }
@@ -292,7 +318,8 @@ router.put('/:id(\\d+)/firmar', requireFirmante, async (req, res, next) => {
 });
 
 // Anulación con traza (en vez de borrado): el reporte queda visible y marcado.
-router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
+// Admin global o admin de Metrología.
+router.put('/:id(\\d+)/anular', requireArea(AREA, true), async (req, res, next) => {
   try {
     const motivo = (req.body.motivo || '').trim();
     if (!motivo) return res.status(400).json({ error: 'El motivo de la anulación es obligatorio' });
@@ -307,9 +334,10 @@ router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
 });
 
 // Borrado DEFINITIVO del reporte completo (a diferencia de Anular, que deja
-// traza): solo admin, y aplica aunque el reporte esté aprobado o firmado.
-// Las pruebas e imágenes caen en cascada; las fotos se limpian del disco.
-router.delete('/:id(\\d+)', requireRol(), async (req, res, next) => {
+// traza): admin global o admin de Metrología, y aplica aunque el reporte esté
+// aprobado o firmado. Las pruebas e imágenes caen en cascada; las fotos se
+// limpian del disco.
+router.delete('/:id(\\d+)', requireArea(AREA, true), async (req, res, next) => {
   try {
     const { rows: fotos } = await query(
       `SELECT i.archivo FROM prueba_imagenes i

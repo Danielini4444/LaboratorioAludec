@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { query } = require('../db');
-const { requireAuth, requireRol, requireArea, requireFirmante } = require('../auth');
+const { requireAuth, requireArea, requireFirmante } = require('../auth');
 const { generarToken, qrDeFirma } = require('../firma');
 const generarEnsayoPinturaPdf = require('../pdf/ensayoPinturaPdf');
 
@@ -17,12 +17,18 @@ function normalizarOfs(ofs) {
   return [...new Set(ofs.map(o => String(o).trim()).filter(Boolean))];
 }
 
-// Puntos de espesor: números (µm) válidos, se descartan vacíos/no numéricos.
-function normalizarPuntos(puntos) {
-  if (!Array.isArray(puntos)) return [];
-  return puntos
-    .map(p => (p === '' || p === null || p === undefined ? null : Number(p)))
-    .filter(p => p !== null && Number.isFinite(p));
+// Espesores de la pieza: un valor por capa. Se descartan filas sin nombre de
+// capa; el valor puede ir vacío (aún no medido) o numérico (µm).
+function normalizarEspesores(espesores) {
+  if (!Array.isArray(espesores)) return [];
+  const limpios = [];
+  for (const e of espesores) {
+    const capa = (e.capa || '').trim();
+    if (!capa) continue;
+    const valor = (e.valor === '' || e.valor === null || e.valor === undefined) ? null : Number(e.valor);
+    limpios.push({ capa, valor: (valor !== null && Number.isFinite(valor)) ? valor : null });
+  }
+  return limpios;
 }
 
 async function cargarEnsayo(id) {
@@ -51,19 +57,33 @@ async function cargarEnsayo(id) {
     `SELECT id, archivo, nombre_original, descripcion
      FROM ensayo_pin_fotos WHERE ensayo_id = $1 ORDER BY id`, [id]
   );
-  // Apartado de espesores: piezas con sus puntos ordenados y si tienen imagen.
+  // Especificación de espesores elegida para el informe (con sus capas), si hay.
+  let especificacion = null;
+  if (ensayo.especificacion_pintura_id) {
+    const { rows: er } = await query(
+      'SELECT id, norma, activa FROM especificaciones_pintura WHERE id = $1', [ensayo.especificacion_pintura_id]
+    );
+    if (er[0]) {
+      const { rows: capas } = await query(
+        `SELECT nombre, espesor_min, espesor_max FROM especificacion_pintura_capas
+         WHERE espec_id = $1 ORDER BY orden`, [er[0].id]
+      );
+      especificacion = { ...er[0], capas };
+    }
+  }
+  // Apartado de espesores: piezas con un valor por capa y si tienen imagen.
   const { rows: piezas } = await query(
     `SELECT id, numero, comentario, imagen_archivo,
             imagen_archivo IS NOT NULL AS tiene_imagen
      FROM ensayo_pin_piezas WHERE ensayo_id = $1 ORDER BY numero`, [id]
   );
   for (const p of piezas) {
-    const { rows: puntos } = await query(
-      'SELECT punto, valor FROM ensayo_pin_espesores WHERE pieza_id = $1 ORDER BY punto', [p.id]
+    const { rows: esp } = await query(
+      'SELECT id, capa, valor FROM ensayo_pin_espesores WHERE pieza_id = $1 ORDER BY id', [p.id]
     );
-    p.espesores = puntos.map(x => (x.valor === null ? null : Number(x.valor)));
+    p.espesores = esp.map(x => ({ capa: x.capa, valor: x.valor === null ? null : Number(x.valor) }));
   }
-  return { ...ensayo, filas, fotos, piezas };
+  return { ...ensayo, especificacion, filas, fotos, piezas };
 }
 
 router.get('/', requireAuth, async (req, res, next) => {
@@ -137,13 +157,18 @@ router.post('/', requireArea(AREA), async (req, res, next) => {
 router.put('/:id(\\d+)', requireArea(AREA), async (req, res, next) => {
   try {
     const { ofs, solicitante, informacion_previa } = req.body;
+    // La especificación puede ponerse o quitarse (null); solo se toca si viene la clave.
+    const tocaEspec = 'especificacion_pintura_id' in req.body;
+    const espId = req.body.especificacion_pintura_id || null;
     const { rows } = await query(
       `UPDATE ensayos_pintura SET
          ofs = COALESCE($1, ofs),
          solicitante = COALESCE($2, solicitante),
-         informacion_previa = COALESCE($3, informacion_previa)
+         informacion_previa = COALESCE($3, informacion_previa),
+         especificacion_pintura_id = CASE WHEN $5 THEN $6 ELSE especificacion_pintura_id END
        WHERE id = $4 AND aprobado_por IS NULL AND anulado_por IS NULL RETURNING *`,
-      [ofs !== undefined ? normalizarOfs(ofs) : null, solicitante, informacion_previa, req.params.id]
+      [ofs !== undefined ? normalizarOfs(ofs) : null, solicitante, informacion_previa, req.params.id,
+       tocaEspec, espId]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Ensayo no encontrado, ya aprobado o anulado' });
     res.json(rows[0]);
@@ -235,7 +260,7 @@ router.post('/:id(\\d+)/piezas', requireArea(AREA), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Actualiza el comentario y REEMPLAZA los puntos de espesor de una pieza.
+// Actualiza el comentario y REEMPLAZA los espesores (un valor por capa) de una pieza.
 router.put('/piezas/:piezaId(\\d+)', requireArea(AREA), async (req, res, next) => {
   try {
     const { rows: pz } = await query(
@@ -249,12 +274,12 @@ router.put('/piezas/:piezaId(\\d+)', requireArea(AREA), async (req, res, next) =
       await query('UPDATE ensayo_pin_piezas SET comentario = $1 WHERE id = $2',
         [(req.body.comentario || '').trim() || null, req.params.piezaId]);
     }
-    if (req.body.puntos !== undefined) {
-      const puntos = normalizarPuntos(req.body.puntos);
+    if (req.body.espesores !== undefined) {
+      const espesores = normalizarEspesores(req.body.espesores);
       await query('DELETE FROM ensayo_pin_espesores WHERE pieza_id = $1', [req.params.piezaId]);
-      for (let i = 0; i < puntos.length; i++) {
-        await query('INSERT INTO ensayo_pin_espesores (pieza_id, punto, valor) VALUES ($1,$2,$3)',
-          [req.params.piezaId, i + 1, puntos[i]]);
+      for (const e of espesores) {
+        await query('INSERT INTO ensayo_pin_espesores (pieza_id, capa, valor) VALUES ($1,$2,$3)',
+          [req.params.piezaId, e.capa, e.valor]);
       }
     }
     res.json({ ok: true });
@@ -313,7 +338,8 @@ router.put('/:id(\\d+)/firmar', requireFirmante, async (req, res, next) => {
 });
 
 // Anulación con traza (en vez de borrado): el informe queda visible y marcado.
-router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
+// Admin global o admin de Metrología.
+router.put('/:id(\\d+)/anular', requireArea(AREA, true), async (req, res, next) => {
   try {
     const motivo = (req.body.motivo || '').trim();
     if (!motivo) return res.status(400).json({ error: 'El motivo de la anulación es obligatorio' });
@@ -327,9 +353,10 @@ router.put('/:id(\\d+)/anular', requireRol(), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Borrado DEFINITIVO del informe completo: solo admin, aplica aunque esté
-// aprobado o firmado. Filas, fotos y piezas caen en cascada; las imágenes se limpian del disco.
-router.delete('/:id(\\d+)', requireRol(), async (req, res, next) => {
+// Borrado DEFINITIVO del informe completo: admin global o admin de Metrología,
+// aplica aunque esté aprobado o firmado. Filas, fotos y piezas caen en cascada;
+// las imágenes se limpian del disco.
+router.delete('/:id(\\d+)', requireArea(AREA, true), async (req, res, next) => {
   try {
     const { rows: fotos } = await query(
       'SELECT archivo FROM ensayo_pin_fotos WHERE ensayo_id = $1', [req.params.id]

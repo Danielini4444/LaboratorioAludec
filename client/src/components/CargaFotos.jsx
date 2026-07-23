@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import CamaraCaptura from './CamaraCaptura.jsx';
 
 // Zona de carga de fotos dentro de un formulario: se eligen una por una o
 // varias de golpe (clic o arrastrar y soltar) y se van ACUMULANDO antes de
@@ -11,6 +12,7 @@ const clave = (a) => `${a.name}|${a.size}|${a.lastModified}`;
 
 export default function CargaFotos({ titulo, archivos, onCambio }) {
   const inputRef = useRef(null);
+  const [camaraAbierta, setCamaraAbierta] = useState(false);
   const [urls, setUrls] = useState([]);
   const [arrastrando, setArrastrando] = useState(false);
 
@@ -48,10 +50,18 @@ export default function CargaFotos({ titulo, archivos, onCambio }) {
         <span>Arrastra fotos aquí o <strong>haz clic para elegir</strong></span>
         <span className="hint">JPG o PNG · una o varias · se van acumulando</span>
       </div>
+      <button type="button" className="chico secundario" style={{ marginTop: 6 }}
+        onClick={() => setCamaraAbierta(true)}>📷 Tomar foto</button>
       <input
         ref={inputRef} type="file" accept="image/jpeg,image/png" multiple hidden
         onChange={e => { agregar(e.target.files); e.target.value = ''; }}
       />
+      {camaraAbierta && (
+        <CamaraCaptura
+          onCaptura={file => agregar([file])}
+          onCerrar={() => setCamaraAbierta(false)}
+        />
+      )}
       {!!archivos.length && (
         <div className="previsualizacion">
           {urls.map((u, i) => (
