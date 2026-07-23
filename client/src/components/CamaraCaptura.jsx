@@ -120,7 +120,7 @@ export default function CamaraCaptura({ onCaptura, onCerrar }) {
             <button type="button" className="secundario" onClick={cerrar}>Cancelar</button>
           </div>
           <input
-            ref={archivoRef} type="file" accept="image/jpeg,image/png" capture="environment"
+            ref={archivoRef} type="file" accept="image/*" capture="environment"
             hidden onChange={usarNativa}
           />
         </div>
